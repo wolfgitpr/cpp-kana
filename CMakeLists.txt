@@ -33,8 +33,8 @@ endif ()
 # ----------------------------------
 # Main Project
 # ----------------------------------
-include_directories(include lib)
-file(GLOB_RECURSE _src include/*.h src/*.h src/*.cpp src/*/*.h src/*/*.cpp lib/*.h)
+include_directories(include)
+file(GLOB_RECURSE _src include/*.h src/*.h src/*.cpp src/*/*.h src/*/*.cpp)
 add_library(${PROJECT_NAME} STATIC ${_src})
 
 if (CPP_KANA_BUILD_TESTS)
@@ -44,7 +44,10 @@ endif ()
 # ----------------------------------
 # link libraries
 # ----------------------------------
-target_include_directories(${PROJECT_NAME} PUBLIC include lib)
+target_include_directories(${PROJECT_NAME} PRIVATE include src)
+target_include_directories(${PROJECT_NAME} PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
 
 # ----------------------------------
 # install
@@ -59,5 +62,9 @@ if (CPP_KANA_INSTALL)
             RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" OPTIONAL
             LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" OPTIONAL
             ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}" OPTIONAL
+    )
+
+    install(DIRECTORY include/${PROJECT_NAME}
+            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 endif ()

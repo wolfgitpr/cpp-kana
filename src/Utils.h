@@ -4,18 +4,15 @@
 #include <string>
 #include <vector>
 
-#include <tinyutf8.h>
-
-typedef tiny_utf8::string u8string;
-typedef std::vector<tiny_utf8::string> u8stringlist;
+#include "U32Str.h"
 
 namespace Kana
 {
     std::vector<std::string> split(const std::string &s, const std::string &delimiter);
 
-    u8stringlist splitString(const u8string &input);
+    u32strVec splitString(const u32str &input);
 
-    std::vector<std::string> toStdList(const u8stringlist &input);
+    std::vector<std::string> toStdList(const u32strVec &input);
 
     bool isLetter(char32_t c);
 

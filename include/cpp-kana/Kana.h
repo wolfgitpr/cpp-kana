@@ -1,13 +1,8 @@
 #ifndef JPG2P_H
 #define JPG2P_H
 
-#include <tinyutf8.h>
-
-typedef tiny_utf8::string u8string;
-typedef std::vector<tiny_utf8::string> u8stringlist;
-
-#include "../src/KanaRes.h"
-#include "../src/RomajiRes.h"
+#include <cpp-kana/KanaRes.h>
+#include <cpp-kana/RomajiRes.h>
 
 namespace Kana
 {
@@ -30,6 +25,8 @@ namespace Kana
                                  KanaType kanaType = KanaType::Hiragana);
 
     std::string convertKana(const std::string &kanaStr, KanaType kanaType);
+
+    std::vector<std::string> convertKana(const std::vector<std::string> &kanaStr, KanaType kanaType);
 
 }
 

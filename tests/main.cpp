@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "Kana.h"
+#include <cpp-kana/kana.h>
 
 int main(int argc, char *argv[]) {
     const std::string raw1 = "これでもやれるだけ飞ばしてきたんだよ";

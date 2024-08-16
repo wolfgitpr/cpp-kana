@@ -1,22 +1,11 @@
 #include "Utils.h"
 
-#include <fstream>
 #include <iostream>
-#include <sstream>
 #include <unordered_set>
 
 
 namespace Kana
 {
-    std::vector<std::string> toStdList(const u8stringlist &input) {
-        std::vector<std::string> result;
-        result.reserve(input.size());
-        for (const auto &item : input) {
-            result.emplace_back(item.c_str());
-        }
-        return result;
-    }
-
     bool isLetter(char32_t c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
     }
@@ -77,8 +66,8 @@ namespace Kana
         return res;
     }
 
-    u8stringlist splitString(const u8string &input) {
-        u8stringlist res;
+    u32strVec splitString(const u32str &input) {
+        u32strVec res;
         int pos = 0;
         while (pos < input.length()) {
             const auto currentChar = input[pos];
