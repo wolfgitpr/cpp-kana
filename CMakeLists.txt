@@ -36,6 +36,7 @@ endif ()
 include_directories(include)
 file(GLOB_RECURSE _src include/*.h src/*.h src/*.cpp src/*/*.h src/*/*.cpp)
 add_library(${PROJECT_NAME} STATIC ${_src})
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 if (CPP_KANA_BUILD_TESTS)
     add_subdirectory(tests)
