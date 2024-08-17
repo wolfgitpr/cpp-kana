@@ -55,7 +55,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # ----------------------------------
 if (CPP_KANA_INSTALL)
     target_include_directories(${PROJECT_NAME} PUBLIC
-            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
 
     install(TARGETS ${PROJECT_NAME}
