@@ -16,8 +16,9 @@ namespace Kana
     enum class KanaType { Hiragana, Katakana };
 
     KanaResVector kanaToRomaji(const std::string &kanaStr, Error error = Error::Default,
-                               const bool &doubleWrittenSokuon = false);
-    KanaResVector kanaToRomaji(const std::vector<std::string> &kanaList, const bool &doubleWrittenSokuon = false);
+                               bool doubleWrittenSokuon = false);
+    KanaResVector kanaToRomaji(const std::vector<std::string> &kanaList, Error error = Error::Default,
+                               bool doubleWrittenSokuon = false);
 
     RomajiResVector romajiToKana(const std::string &romajiStr, Error error = Error::Default,
                                  KanaType kanaType = KanaType::Hiragana);

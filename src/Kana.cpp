@@ -127,11 +127,11 @@ namespace Kana
         return res;
     }
 
-    KanaResVector kanaToRomaji(const std::string &kanaStr, Error error, const bool &doubleWrittenSokuon) {
+    KanaResVector kanaToRomaji(const std::string &kanaStr, Error error, bool doubleWrittenSokuon) {
         return u8kanaToRomaji(splitString(utf8strToU32str(kanaStr)), error, doubleWrittenSokuon);
     }
 
-    KanaResVector kanaToRomaji(const std::vector<std::string> &kanaList, Error error, const bool &doubleWrittenSokuon) {
+    KanaResVector kanaToRomaji(const std::vector<std::string> &kanaList, Error error, bool doubleWrittenSokuon) {
         u32strVec inputList;
         inputList.reserve(kanaList.size());
         for (const auto &item : kanaList) {
