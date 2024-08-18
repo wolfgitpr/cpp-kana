@@ -1,0 +1,30 @@
+#include <cpp-kana/KanaRes.h>
+
+namespace Kana
+{
+    // Convert KanaResVector to std::vector<std::string>
+    std::vector<std::string> KanaResVector::toStdVector() const {
+        std::vector<std::string> result;
+        result.reserve(this->size());
+        for (const auto &res : *this) {
+            result.emplace_back(res.error ? res.kana : res.romaji);
+        }
+        return result;
+    }
+
+    // Convert KanaResVector to std::string with delimiter
+    std::string KanaResVector::toStdStr(const std::string &delimiter) const {
+        std::string result;
+        bool first = true;
+
+        for (const auto &res : *this) {
+            if (!first) {
+                result += delimiter;
+            }
+            result += res.error ? res.kana : res.romaji;
+            first = false;
+        }
+
+        return result;
+    }
+}

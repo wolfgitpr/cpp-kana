@@ -4,41 +4,23 @@
 #include <string>
 #include <vector>
 
+#include <cpp-kana/KanaGlobal.h>
+
 namespace Kana
 {
-    struct KanaRes {
+    struct CPP_KANA_EXPORT KanaRes {
         std::string kana;
         std::string romaji;
         bool error = true; //  Whether the conversion failed.
     };
 
-    class KanaResVector : public std::vector<KanaRes> {
+    class CPP_KANA_EXPORT KanaResVector : public std::vector<KanaRes> {
     public:
         // Convert KanaResVector to std::vector<std::string>
-        inline std::vector<std::string> toStdVector() const {
-            std::vector<std::string> result;
-            result.reserve(this->size());
-            for (const auto &res : *this) {
-                result.emplace_back(res.error ? res.kana : res.romaji);
-            }
-            return result;
-        }
+        std::vector<std::string> toStdVector() const;
 
         // Convert KanaResVector to std::string with delimiter
-        inline std::string toStdStr(const std::string &delimiter = " ") const {
-            std::string result;
-            bool first = true;
-
-            for (const auto &res : *this) {
-                if (!first) {
-                    result += delimiter;
-                }
-                result += res.error ? res.kana : res.romaji;
-                first = false;
-            }
-
-            return result;
-        }
+        std::string toStdStr(const std::string &delimiter = " ") const;
     };
 }
 
