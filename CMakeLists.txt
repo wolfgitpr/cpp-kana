@@ -65,6 +65,15 @@ if (CPP_KANA_BUILD_TESTS)
 endif ()
 
 # ----------------------------------
+# Add platform specific
+# ----------------------------------
+if (WIN32)
+    set(RC_DESCRIPTION "A lightweight library for converting Japanese kana to romaji and vice versa.")
+    set(RC_COPYRIGHT "Copyright (C) 2023-2024 wolfgitpr")
+    include("cmake/winrc.cmake")
+endif ()
+
+# ----------------------------------
 # link libraries
 # ----------------------------------
 target_include_directories(${PROJECT_NAME} PRIVATE include src)
