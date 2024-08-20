@@ -2,6 +2,7 @@
 #define U32STR_H
 
 #include <string>
+#include <vector>
 #include <unordered_map>
 
 namespace Kana
