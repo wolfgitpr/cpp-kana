@@ -450,8 +450,8 @@ namespace Kana
         return resultList;
     }
 
-    static KanaResVector u8kanaToRomaji(const u32strVec &kanaList, Error error, const bool &doubleWrittenSokuon) {
-        KanaResVector res;
+    static RomajiResVector u8kanaToRomaji(const u32strVec &kanaList, Error error, const bool &doubleWrittenSokuon) {
+        RomajiResVector res;
         const u32strVec inputList = convertKana(kanaList, KanaType::Hiragana);
         u32strVec romajiList;
 
@@ -460,9 +460,9 @@ namespace Kana
             if (kana != U"゜" && kana != U"ー") {
                 const auto it = kanaToRomajiMap.find(kana);
                 if (it != kanaToRomajiMap.end())
-                    res.emplace_back(KanaRes{kana.encodeUtf8(), it->second.encodeUtf8(), false});
+                    res.emplace_back(RomajiRes{kana.encodeUtf8(), it->second.encodeUtf8(), false});
                 else if (error == Error::Default)
-                    res.emplace_back(KanaRes{kana.encodeUtf8(), kana.encodeUtf8(), true});
+                    res.emplace_back(RomajiRes{kana.encodeUtf8(), kana.encodeUtf8(), true});
             }
         }
 
@@ -482,11 +482,11 @@ namespace Kana
         return res;
     }
 
-    KanaResVector kanaToRomaji(const std::string &kanaStr, Error error, bool doubleWrittenSokuon) {
+    RomajiResVector kanaToRomaji(const std::string &kanaStr, Error error, bool doubleWrittenSokuon) {
         return u8kanaToRomaji(splitString(utf8strToU32str(kanaStr)), error, doubleWrittenSokuon);
     }
 
-    KanaResVector kanaToRomaji(const std::vector<std::string> &kanaList, Error error, bool doubleWrittenSokuon) {
+    RomajiResVector kanaToRomaji(const std::vector<std::string> &kanaList, Error error, bool doubleWrittenSokuon) {
         u32strVec inputList;
         inputList.reserve(kanaList.size());
         for (const auto &item : kanaList) {
@@ -495,28 +495,28 @@ namespace Kana
         return u8kanaToRomaji(inputList, error, doubleWrittenSokuon);
     }
 
-    static RomajiResVector u8romajiToKana(const u32strVec &romajiList, Error error, KanaType kanaType) {
-        RomajiResVector res;
+    static KanaResVector u8romajiToKana(const u32strVec &romajiList, Error error, KanaType kanaType) {
+        KanaResVector res;
         for (const u32str &romaji : romajiList) {
             const auto it = romajiToKanaMap.find(romaji);
             if (it != romajiToKanaMap.end()) {
-                res.emplace_back(RomajiRes{romaji.encodeUtf8(),
+                res.emplace_back(KanaRes{romaji.encodeUtf8(),
                                            kanaType == KanaType::Hiragana
                                            ? it->second.encodeUtf8()
                                            : convertKana(it->second, KanaType::Katakana).encodeUtf8(),
                                            false});
             } else if (error == Error::Default)
-                res.emplace_back(RomajiRes{romaji.encodeUtf8(), romaji.encodeUtf8(), true});
+                res.emplace_back(KanaRes{romaji.encodeUtf8(), romaji.encodeUtf8(), true});
         }
         return res;
     }
 
-    RomajiResVector romajiToKana(const std::string &romajiStr, Error error, KanaType kanaType) {
+    KanaResVector romajiToKana(const std::string &romajiStr, Error error, KanaType kanaType) {
         const u32strVec input = splitString(utf8strToU32str(romajiStr));
         return u8romajiToKana(input, error, kanaType);
     }
 
-    RomajiResVector romajiToKana(const std::vector<std::string> &romajiList, Error error, KanaType kanaType) {
+    KanaResVector romajiToKana(const std::vector<std::string> &romajiList, Error error, KanaType kanaType) {
         u32strVec inputList;
         inputList.reserve(romajiList.size());
         for (const auto &item : romajiList) {
