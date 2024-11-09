@@ -16,20 +16,21 @@ namespace Kana
 
     enum CPP_KANA_EXPORT KanaType { Hiragana, Katakana };
 
-    RomajiResVector CPP_KANA_EXPORT kanaToRomaji(const std::string &kanaStr, Error error = Default,
-                                               bool doubleWrittenSokuon = false);
-    RomajiResVector CPP_KANA_EXPORT kanaToRomaji(const std::vector<std::string> &kanaList, Error error = Default,
-                                               bool doubleWrittenSokuon = false);
+    RomajiResVector CPP_KANA_EXPORT kanaToRomaji(const std::string &kanaStr, const Error &error = Default,
+                                                 bool doubleWrittenSokuon = false);
+    RomajiResVector CPP_KANA_EXPORT kanaToRomaji(const std::vector<std::string> &kanaList, const Error &error = Default,
+                                                 bool doubleWrittenSokuon = false);
 
-    KanaResVector CPP_KANA_EXPORT romajiToKana(const std::string &romajiStr, Error error = Default,
-                                                 KanaType kanaType = Hiragana);
+    KanaResVector CPP_KANA_EXPORT romajiToKana(const std::string &romajiStr, const Error &error = Default,
+                                               const KanaType &kanaType = Hiragana);
     KanaResVector CPP_KANA_EXPORT romajiToKana(const std::vector<std::string> &romajiList,
-                                                 Error error = Default,
-                                                 KanaType kanaType = Hiragana);
+                                               const Error &error = Default,
+                                               const KanaType &kanaType = Hiragana);
 
-    std::string CPP_KANA_EXPORT convertKana(const std::string &kanaStr, KanaType kanaType);
+    std::string CPP_KANA_EXPORT convertKana(const std::string &kanaStr, const KanaType &kanaType);
 
-    std::vector<std::string> CPP_KANA_EXPORT convertKana(const std::vector<std::string> &kanaStr, KanaType kanaType);
+    std::vector<std::string> CPP_KANA_EXPORT convertKana(const std::vector<std::string> &kanaList,
+                                                         const KanaType &kanaType);
 
 }
 
