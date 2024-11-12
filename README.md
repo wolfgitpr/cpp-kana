@@ -6,6 +6,17 @@ cpp-kana is a lightweight library for converting Japanese kana to romaji and vic
 
 It is written in C++ and uses a simple algorithm to perform the conversion.
 
+## Install
+
+```bash
+vcpkg install cpp-kana
+```
+
+```cmake
+find_package(cpp-kana)
+target_link_libraries(${PROJECT_NAME} PRIVATE cpp-kana::cpp-kana)
+```
+
 ## Usage
 
 ```c++

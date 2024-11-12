@@ -2,15 +2,15 @@
 # Project
 # ----------------------------------
 cmake_minimum_required(VERSION 3.17)
-project(cpp-kana VERSION 0.0.0.1 LANGUAGES CXX)
+project(cpp-kana VERSION 1.0.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
 # ----------------------------------
 # Build Options
 # ----------------------------------
-option(CPP_KANA_BUILD_STATIC "Build static library" ON)
-option(CPP_KANA_BUILD_TESTS "Build test cases" ON)
+option(CPP_KANA_BUILD_STATIC "Build static library" OFF)
+option(CPP_KANA_BUILD_TESTS "Build test cases" OFF)
 option(CPP_KANA_INSTALL "Install library" ON)
 
 # ----------------------------------
