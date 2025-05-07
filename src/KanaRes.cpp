@@ -6,8 +6,8 @@ namespace Kana
     std::vector<std::string> KanaResVector::toStdVector() const {
         std::vector<std::string> result;
         result.reserve(this->size());
-        for (const auto &res : *this) {
-            result.emplace_back(res.error ? res.romaji : res.kana);
+        for (const auto &[romaji, kana, error] : *this) {
+            result.emplace_back(error ? romaji : kana);
         }
         return result;
     }
@@ -17,11 +17,11 @@ namespace Kana
         std::string result;
         bool first = true;
 
-        for (const auto &res : *this) {
+        for (const auto &[romaji, kana, error] : *this) {
             if (!first) {
                 result += delimiter;
             }
-            result += res.error ? res.romaji : res.kana;
+            result += error ? romaji : kana;
             first = false;
         }
 

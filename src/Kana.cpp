@@ -182,7 +182,7 @@ namespace Kana
         {u"ろ", u"ro"},
         {u"わ", u"wa"},
         {u"を", u"o"},
-        {u"ん", u"N"},
+        {u"ん", u"n"},
         {u"ゔぁ", u"va"},
         {u"ゔぃ", u"vi"},
         {u"ゔ", u"vu"},
@@ -360,17 +360,17 @@ namespace Kana
         {u"ro", u"ろ"},
         {u"wa", u"わ"},
         {u"o", u"を"},
-        {u"N", u"ん"},
+        {u"n", u"ん"},
         {u"va", u"ゔぁ"},
         {u"vi", u"ゔぃ"},
         {u"vu", u"ゔ"},
         {u"ve", u"ゔぇ"},
         {u"vo", u"ゔぉ"}};
 
-    static std::u16string convertKana(const std::u16string &kana, KanaType kanaType) {
+    static std::u16string convertKana(const std::u16string &kana, const KanaType kanaType) {
         std::u16string convertedKana;
         for (const char32_t kanaChar : kana) {
-            if (kanaType == KanaType::Hiragana) {
+            if (kanaType == Hiragana) {
                 // target is Hiragana
                 if (kanaChar >= katakanaStart && kanaChar < katakanaStart + 0x5E) {
                     // Katakana->Hiragana
@@ -392,10 +392,12 @@ namespace Kana
     }
 
     // convert Hiragana to Katakana
-    static std::vector<std::u16string> convertKana(const std::vector<std::u16string> &kanaList, KanaType kanaType) {
-        std::vector<std::u16string> inputlist;
+    static std::vector<std::u16string>
+    convertKana(const std::vector<std::u16string> &kanaList, const KanaType kanaType) {
+        std::vector<std::u16string> inputList;
+        inputList.reserve(kanaList.size());
         for (const auto &kana : kanaList)
-            inputlist.emplace_back(kana);
+            inputList.emplace_back(kana);
 
         std::vector<std::u16string> convertedList;
         const std::regex rx("[\u3040-\u309F\u30A0-\u30FF]+");
@@ -404,7 +406,7 @@ namespace Kana
             std::u16string convertedKana;
             if (std::regex_match(u16strToUtf8str(kana), rx)) {
                 for (const char32_t kanaChar : kana) {
-                    if (kanaType == KanaType::Hiragana) {
+                    if (kanaType == Hiragana) {
                         // target is Hiragana
                         if (kanaChar >= katakanaStart && kanaChar < katakanaStart + 0x5E) {
                             // Katakana->Hiragana
@@ -455,16 +457,15 @@ namespace Kana
     static RomajiResVector u8kanaToRomaji(const std::vector<std::u16string> &kanaList, const Error &error,
                                           const bool &doubleWrittenSokuon) {
         RomajiResVector res;
-        const std::vector<std::u16string> inputList = convertKana(kanaList, KanaType::Hiragana);
+        const std::vector<std::u16string> inputList = convertKana(kanaList, Hiragana);
         std::vector<std::u16string> romajiList;
 
         // convert kana to romaji
         for (const std::u16string &kana : inputList) {
             if (kana != u"゜" && kana != u"ー") {
-                const auto it = kanaToRomajiMap.find(kana);
-                if (it != kanaToRomajiMap.end())
+                if (const auto it = kanaToRomajiMap.find(kana); it != kanaToRomajiMap.end())
                     res.emplace_back(RomajiRes{u16strToUtf8str(kana), u16strToUtf8str(it->second), false});
-                else if (error == Error::Default)
+                else if (error == Default)
                     res.emplace_back(RomajiRes{u16strToUtf8str(kana), u16strToUtf8str(kana), true});
             }
         }
@@ -472,8 +473,7 @@ namespace Kana
         // double written sokuon
         for (int i = 0; i < res.size() - 1 && doubleWrittenSokuon; ++i) {
             char32_t nextChar = U' ';
-            const auto it = romajiToKanaMap.find(utf8strToU16str(res[i].romaji));
-            if (it != romajiToKanaMap.end())
+            if (const auto it = romajiToKanaMap.find(utf8strToU16str(res[i].romaji)); it != romajiToKanaMap.end())
                 nextChar = it->second.at(0);
             if (res[i].romaji == "cl" && isKana(nextChar) &&
                 std::u32string(U"あいうえおアイウエオっんを").find(nextChar) == std::u32string::npos) {
@@ -485,12 +485,12 @@ namespace Kana
         return res;
     }
 
-    RomajiResVector kanaToRomaji(const std::string &kanaStr, const Error &error, bool doubleWrittenSokuon) {
+    RomajiResVector kanaToRomaji(const std::string &kanaStr, const Error &error, const bool doubleWrittenSokuon) {
         return u8kanaToRomaji(splitString(utf8strToU16str(kanaStr)), error, doubleWrittenSokuon);
     }
 
     RomajiResVector kanaToRomaji(const std::vector<std::string> &kanaList, const Error &error,
-                                 bool doubleWrittenSokuon) {
+                                 const bool doubleWrittenSokuon) {
         std::vector<std::u16string> inputList;
         inputList.reserve(kanaList.size());
         for (const auto &item : kanaList) {
