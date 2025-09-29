@@ -47,7 +47,7 @@ namespace Kana
                     ++start;
                 }
                 res.emplace_back(letterStart, start);
-            } else if (Kana::isHanzi(currentChar) || Kana::isDigit(currentChar) || !Kana::isSpace(currentChar)) {
+            } else if ((Kana::isHanzi(currentChar) || Kana::isDigit(currentChar)) && !Kana::isSpace(currentChar)) {
                 res.emplace_back(1, currentChar);
                 ++start;
             } else if (Kana::isKana(currentChar)) {

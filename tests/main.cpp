@@ -3,7 +3,7 @@
 #include <cpp-kana/kana.h>
 
 int main(int argc, char *argv[]) {
-    const std::string raw1 = "これでもやれるだけ飞ばしてきたんだよ";
+    const std::string raw1 = "ちゃこれでもやれるだけ飞ばしてきたんだよ";
     const auto res1 = Kana::kanaToRomaji(raw1, Kana::Error::Default, true).toStdStr();
     std::cout << "test1: Kana->romaji (Default)" << std::endl << raw1 << " -> " << res1 << std::endl;
 
