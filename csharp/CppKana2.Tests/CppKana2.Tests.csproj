@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- A console runner instead of a test framework: xunit/NUnit would need a NuGet restore, and this
+         repository has no network dependency in any of its suites. The runner is ~80 lines and exits
+         non-zero on failure, which is the entire contract a CI step needs. -->
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net7.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CppKana2\CppKana2.csproj" />
+  </ItemGroup>
+
+  <!-- The native library has to sit next to the test assembly. It is passed in rather than discovered, so
+       a stale build cannot be picked up silently. -->
+  <ItemGroup Condition="'$(CppKana2NativeDir)' != ''">
+    <None Include="$(CppKana2NativeDir)\*cpp-kana2.dll" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(CppKana2NativeDir)\*cpp-kana2.so" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(CppKana2NativeDir)\*cpp-kana2.dylib" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+</Project>

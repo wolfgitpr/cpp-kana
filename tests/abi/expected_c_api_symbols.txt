@@ -1,0 +1,10 @@
+# The C ABI symbols, frozen. Every cppk2_* entry point the library exports.
+cppk2_code_text
+cppk2_conversion_free
+cppk2_convert_script
+cppk2_kana_options_init
+cppk2_kana_to_romaji
+cppk2_romaji_options_init
+cppk2_romaji_to_kana
+cppk2_string_free
+cppk2_version

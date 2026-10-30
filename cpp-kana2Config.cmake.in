@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/cpp-kana2Targets.cmake")
+
+# Where the mora table was installed. The pkg-config file exports `datadir=` for the same directory and
+# the two are computed from the same CMAKE_INSTALL_DATADIR, so they cannot drift. set_and_check fails the
+# consumer's configure when the directory is missing -- a missing table must not look like an empty one.
+set_and_check(CPP_KANA2_DATA_DIR "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/cpp-kana2")

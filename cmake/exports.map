@@ -1,0 +1,35 @@
+/* The ELF export list: the C ABI, the C++ public namespace, and nothing else.
+ *
+ * Why a version script and not just -fvisibility=hidden: MEASURED on the Linux board replay (GCC 14, ELF), the
+ * library exported 8 standard-library internals even with hidden visibility -- std::vector<cpp_kana::v2::Mora>
+ * ::reserve, std::__cxx11::basic_string<char32_t>::_M_construct and friends. They are emitted with default
+ * visibility because they are instantiated in the translation unit that defines a default-visibility class. On
+ * PE there are no such symbols in the export table (the DLL uses dllexport plus --exclude-all-symbols), which
+ * is why the Windows gate never saw them: the two platforms need different mechanisms for the same promise.
+ *
+ * MEASURED with this file on the board: 24 exports -- 9 cppk2_* entry points, 12 _ZN8cpp_kana2v2* functions,
+ * and one each of _ZTI/_ZTS/_ZTV for ErrorException. Standard-library internals: 0 (was 8).
+ *
+ * The patterns are the Itanium mangling of cpp_kana::v2, which reads "_ZN8cpp_kana2v2..." (8cpp_kana + 2v2):
+ *   _ZN   a nested function or constructor
+ *   _ZNK  the same, but const -- MISSING this in the first version cost every `Conversion::ok() const` and
+ *         `rendered() const`, and the board replay caught the link failure in the conformance tool and in an
+ *         independent consumer. Const member functions are not a corner case here; they are most of the API.
+ *   _ZTI/_ZTS/_ZTV  typeinfo, typeinfo name, vtable. These must stay exported: a consumer that catches
+ *         cpp_kana::v2::ErrorException needs the typeinfo to match, and hiding it turns a catchable exception
+ *         into std::terminate. Verified on the board with a probe: "PROBE=CAUGHT_BY_TYPE code=2".
+ *
+ * Comments must be C comments, not ";;" -- GNU ld's version-script lexer has no other comment syntax, and
+ * ";;" fails the LINK, not just the comment.
+ */
+{
+  global:
+    cppk2_*;
+    _ZN8cpp_kana2v2*;
+    _ZNK8cpp_kana2v2*;
+    _ZTIN8cpp_kana2v2*;
+    _ZTSN8cpp_kana2v2*;
+    _ZTVN8cpp_kana2v2*;
+  local:
+    *;
+};

@@ -1,0 +1,35 @@
+# Line-ending / byte-fidelity policy for cpp-kana2.
+#
+# Why this file exists: conformance/cases.sha256 is checked against conformance/cases.json's BYTES.
+# On Windows git's default core.autocrlf=true rewrites LF as CRLF on checkout, so a fixture generated
+# with LF would hash one way on the machine that generated it and another way in a fresh clone.
+# `text eol=lf` is the narrow fix: git stores LF and every checkout gets LF back on every platform.
+# There is deliberately no blanket `*` rule -- that would change how every existing file is stored.
+
+conformance/cases.json text eol=lf
+conformance/cases.sha256 text eol=lf
+
+# The mora table and the corpus under tests/data are DATA: git must not normalise them at all, so the
+# bytes a reader sees (and that check_data_tables.py hashes) are the bytes committed.
+tests/data/** -text
+data/** -text
+
+# Every script the suites run through `bash` / every source file: LF everywhere. The second reason for
+# sources is the clang-format the tree was formatted with; on a
+# CRLF checkout that output differs by every line ending and the gate would fail on a machine where
+# nothing is actually wrong.
+*.sh text eol=lf
+*.c text eol=lf
+*.cc text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.cs text eol=lf
+*.json text eol=lf
+*.inc text eol=lf
+CMakeLists.txt text eol=lf
+*.cmake text eol=lf
+
+

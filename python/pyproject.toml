@@ -1,0 +1,8 @@
+[build-system]
+# The measured recipe is:
+#     python -m pip wheel . --no-build-isolation --no-deps -w dist
+# `python -m build` is not used, and with --no-build-isolation the requirements below come from the
+# ambient environment, so no network access is needed. Everything else (metadata, package data, the
+# platform tag) lives in setup.py.
+requires = ["setuptools>=70.1"]
+build-backend = "setuptools.build_meta"

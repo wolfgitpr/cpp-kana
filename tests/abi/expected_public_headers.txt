@@ -1,0 +1,8 @@
+# The public headers, frozen. Edit in the same commit as the header that moves (K4/K5).
+include/cpp-kana2/core/Convert.h
+include/cpp-kana2/core/Global.h
+include/cpp-kana2/core/Mora.h
+include/cpp-kana2/core/Types.h
+include/cpp-kana2/core/Utf8.h
+include/cpp-kana2/core/Version.h
+include/cpp-kana2/ext/c_api.h

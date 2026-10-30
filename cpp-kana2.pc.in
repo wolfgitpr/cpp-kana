@@ -1,0 +1,23 @@
+prefix=${pcfiledir}/../..
+
+# cpp-kana2 pkg-config file
+
+exec_prefix=${prefix}/bin
+# Substituted, not written out: CMake's GNUInstallDirs says `lib` on Debian/Ubuntu but `lib64` on the
+# RPM family, so a literal `lib` here would make -L${libdir} wrong on those distributions.
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/include
+
+# The mora table ships with the library.
+datadir=${prefix}/@CMAKE_INSTALL_DATADIR@/cpp-kana2
+
+Name: cpp-kana2
+Description: A C++17 library for converting Japanese kana to romaji and back.
+Version: @version@
+Requires:
+Conflicts:
+
+# CPP_KANA2_STATIC selects the no-dllimport branch of Global.h and is a PUBLIC compile definition on the
+# CMake target; a .pc consumer inherits nothing, so the static install writes it out again.
+Cflags: -I${includedir} -std=c++17@CPP_KANA2_PC_EXTRA_CFLAGS@
+Libs: -L${libdir} -lcpp-kana2

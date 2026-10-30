@@ -1,0 +1,124 @@
+# Baseline corpus for cpp-kana v1 -> v2 behaviour comparison.
+#
+# One case per line, tab-separated: direction <TAB> text
+#   direction = kana   : the text is fed to kanaToRomaji with each of nine option sets (default, compact,
+#                        drop-sokuon, plain-hatsuon, drop-long-vowel, dash-long-vowel, uppercase, unknown-fail,
+#                        and convertScript(Katakana))
+#   direction = romaji : the text is fed to romajiToKana (hiragana and katakana)
+#
+# Lines starting with '#' and blank lines are skipped. The file is UTF-8 with LF endings and is
+# pinned by .gitattributes (`tests/data/** -text`), because the v1 snapshot below was produced from
+# exactly these bytes and a CRLF checkout would change the input.
+
+# --- gojuon rows ---------------------------------------------------------------------------
+kana	あいうえお
+kana	かきくけこ
+kana	さしすせそ
+kana	たちつてと
+kana	なにぬねの
+kana	はひふへほ
+kana	まみむめも
+kana	やゆよ
+kana	らりるれろ
+kana	わをん
+
+# --- voiced / semi-voiced / yoon -----------------------------------------------------------
+kana	がぎぐげござじずぜぞ
+kana	だぢづでど
+kana	ばびぶべぼぱぴぷぺぽ
+kana	きゃきゅきょしゃしゅしょ
+kana	ちゃちゅちょにゃにゅにょ
+kana	ひゃひゅひょみゃみゅみょ
+kana	りゃりゅりょぎゃぎゅぎょ
+kana	じゃじゅじょびゃびゅびょぴゃぴゅぴょ
+
+# --- sokuon / hatsuon / long vowel ----------------------------------------------------------
+kana	こんにちは
+kana	こんばんは
+kana	しんよう
+kana	きって
+kana	まっちゃ
+kana	がっこう
+kana	ちょっと
+kana	とうきょう
+kana	おおさか
+kana	おばあさん
+kana	コーヒー
+kana	ケーキ
+kana	スーパー
+
+# --- katakana / foreign combinations --------------------------------------------------------
+kana	カタカナ
+kana	ファイル
+kana	ヴァイオリン
+kana	ティー
+kana	パーティー
+kana	ふぁふぃふぇふぉ
+kana	うぃうぇうぉ
+kana	くぁくぃくぇくぉ
+kana	つぁつぃつぇつぉ
+kana	でぃでゅ
+kana	とぅどぅ
+
+# --- characters v1 does not handle (the reason for the rewrite) ------------------------------
+kana	ｶﾀｶﾅ
+kana	か゛く
+kana	ゔ
+kana	ゐゑ
+kana	これでもやれるだけ飞ばしてきたんだよ
+kana	こん好にちは
+
+# --- romaji inputs (reverse direction) ------------------------------------------------------
+romaji	konnichiha
+romaji	kitte
+romaji	matcha
+romaji	gakkou
+romaji	shin'you
+romaji	toukyou
+romaji	koohii
+romaji	ji
+romaji	zu
+romaji	sha
+romaji	sya
+romaji	chi
+romaji	ti
+romaji	tsu
+romaji	tu
+romaji	fu
+romaji	hu
+romaji	wo
+romaji	n
+romaji	nn
+romaji	kya
+romaji	ka
+
+# --- punctuation, digits, iteration marks, katakana-only kana ------------------------------
+kana	あ、い。う
+kana	123あいう
+kana	ゝゞ
+kana	ヷヸヹヺ
+kana	ーあ
+kana	こんにちは、世界
+kana	ヴァイオリンとヴィオラ
+kana	ティーカップ
+
+# --- more reverse-direction spellings -----------------------------------------------------
+romaji	konnichiha!
+romaji	KITTE
+romaji	n'
+romaji	shinsai
+romaji	kan'i
+romaji	tya
+# --- regression cases found by the P9 adversarial review -------------------------------------
+# The wa-row kana have no hiragana form: ヷ and its two other spellings must all read "va", and the
+# dakuten must not be silently dropped when the base kana has already been folded.
+kana	ヷ
+kana	ワ゛
+kana	ﾜﾞ
+kana	ヰ゛
+# nn followed by a syllable spelled with two consonants: "nnya" is ん + にゃ, not ん + や.
+romaji	nnya
+romaji	nnyu
+romaji	nnyo
+# a multi-code-point syllable is still a Syllable, not "Other" (morae kinds are checked by the suites)
+romaji	kya

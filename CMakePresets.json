@@ -1,0 +1,58 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Release with Ninja, tests and install on",
+      "description": "Reproduces the configuration this repository is verified with on the development machine (MinGW g++). Build output goes under .tmp/, so no IDE grows cmake-build-* in the repository root again. Using presets needs CMake 3.21 or newer; the library itself still needs only 3.17.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/.tmp/build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "ON",
+        "CPP_KANA2_BUILD_TESTS": "ON",
+        "CPP_KANA2_BUILD_EXAMPLES": "OFF",
+        "CPP_KANA2_INSTALL": "ON"
+      }
+    },
+    {
+      "name": "static",
+      "displayName": "Release, static library, tests on",
+      "description": "The second measured leg: the archive a consumer links into its own shared object, which is why POSITION_INDEPENDENT_CODE is forced on in that configuration.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/.tmp/build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_SHARED_LIBS": "OFF",
+        "CPP_KANA2_BUILD_TESTS": "ON",
+        "CPP_KANA2_BUILD_EXAMPLES": "OFF",
+        "CPP_KANA2_INSTALL": "ON"
+      }
+    },
+    {
+      "name": "sanitize",
+      "displayName": "RelWithDebInfo with ASan+UBSan (GCC/Clang)",
+      "description": "What the Linux sanitizer leg of CI runs. The option refuses to configure when the toolchain cannot build with the sanitizer runtimes, rather than quietly producing an uninstrumented build.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/.tmp/build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_SHARED_LIBS": "ON",
+        "CPP_KANA2_BUILD_TESTS": "ON",
+        "CPP_KANA2_INSTALL": "ON",
+        "CPP_KANA2_SANITIZE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "default", "configurePreset": "default" },
+    { "name": "static", "configurePreset": "static" },
+    { "name": "sanitize", "configurePreset": "sanitize" }
+  ],
+  "testPresets": [
+    { "name": "default", "configurePreset": "default", "output": { "outputOnFailure": true } },
+    { "name": "static", "configurePreset": "static", "output": { "outputOnFailure": true } },
+    { "name": "sanitize", "configurePreset": "sanitize", "output": { "outputOnFailure": true } }
+  ]
+}

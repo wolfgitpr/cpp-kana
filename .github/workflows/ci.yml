@@ -1,0 +1,157 @@
+# CI for cpp-kana2.
+#
+# Every job runs the same suite the development machine runs: configure, build, ctest. The gates are part of
+# ctest (Gate_* tests), so a platform that builds also runs them; the few that need a tool the runner lacks
+# (readelf, objdump, python) report themselves as skipped instead of silently passing.
+#
+# Deliberately NOT here: benchmarks, coverage uploads, and dependency caches for things this project does not
+# depend on. The library has no third-party dependency, so every job is a compiler plus CMake.
+
+name: ci
+
+on:
+  push:
+    branches: [v2, main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # A CI job that keeps building after an error wastes the reader's time and the runner's minutes.
+  CMAKE_ERROR_ON_ABSOLUTE_INSTALL_DESTINATION: ON
+
+jobs:
+  linux-gcc:
+    name: Linux / GCC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build python3
+      - name: Configure
+        run: cmake --preset default
+      - name: Build
+        run: cmake --build --preset default
+      - name: Test
+        run: ctest --preset default
+      - name: Gates (self-test then run)
+        run: python3 tools/run_all_gates.py
+
+  linux-clang:
+    name: Linux / Clang
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang python3
+      - name: Configure
+        run: cmake --preset default -DCMAKE_CXX_COMPILER=clang++
+      - name: Build
+        run: cmake --build --preset default
+      - name: Test
+        run: ctest --preset default
+
+  linux-sanitize:
+    name: Linux / GCC + ASan and UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake --preset sanitize
+      - name: Build
+        run: cmake --build --preset sanitize
+      - name: Test
+        env:
+          # Leak detection is on by default under ASan; keep it on so a leaked conversion fails the run.
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --preset sanitize
+
+  linux-static:
+    name: Linux / static library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build python3
+      - name: Configure
+        run: cmake --preset static
+      - name: Build
+        run: cmake --build --preset static
+      - name: Test
+        run: ctest --preset static
+
+  windows-msvc:
+    name: Windows / MSVC
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure
+        run: cmake -S . -B .tmp/build-msvc -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCPP_KANA2_BUILD_TESTS=ON -DCPP_KANA2_INSTALL=ON
+      - name: Build
+        run: cmake --build .tmp/build-msvc
+      - name: Test
+        run: ctest --test-dir .tmp/build-msvc --output-on-failure
+      - name: Gates
+        run: python tools/run_all_gates.py
+
+  windows-mingw:
+    name: Windows / MinGW
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
+      - name: Configure
+        run: cmake --preset default
+      - name: Build
+        run: cmake --build --preset default
+      - name: Test
+        run: ctest --preset default
+
+  python:
+    name: Python binding / Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3 python3-pip python3-venv
+          python3 -m pip install --user pytest
+      - name: Build and stage the native library
+        run: python3 python/tools/build_native.py
+      - name: Test
+        run: python3 -m pytest python/tests -q
+      - name: Contract check (the transcription must match the header)
+        run: python3 tools/check_bindings.py
+
+  csharp:
+    name: C# binding / Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            7.0.x
+            10.0.x
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3
+      - name: Build and stage the native library
+        run: python3 python/tools/build_native.py
+      - name: Generate build info and run the suite
+        run: python3 csharp/tools/run_tests.py

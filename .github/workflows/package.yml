@@ -1,0 +1,73 @@
+# Windows and Linux packaging dry-runs.
+#
+# Neither job publishes anything. They exist to prove the two packaging paths BUILD, because both have
+# failure modes that only appear at package time: a Python wheel tagged for the wrong platform, and a NuGet
+# package whose runtimes/<rid>/native/ directory is empty because the native library was not staged.
+
+name: package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  python-wheel:
+    name: Python wheel (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Build and stage the native library
+        run: python python/tools/build_native.py
+      - name: Build the wheel
+        run: python -m pip wheel ./python --no-build-isolation --no-deps -w dist
+      - name: Show the wheel tag
+        run: python -c "import pathlib; print([p.name for p in pathlib.Path('dist').iterdir()])"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ runner.os }}
+          path: dist/*.whl
+
+  nuget:
+    name: NuGet package / Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            7.0.x
+            10.0.x
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build the native library
+        run: |
+          cmake -S . -B .tmp/build-pack -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCPP_KANA2_BUILD_TESTS=OFF
+          cmake --build .tmp/build-pack
+      - name: Generate build info
+        run: python csharp/tools/emit_build_info.py --native .tmp/build-pack/bin/cpp-kana2.dll
+      - name: Pack
+        run: dotnet pack csharp/CppKana2/CppKana2.csproj -c Release -p:CppKana2Rid=win-x64 -p:CppKana2NativeDir=.tmp/build-pack/bin -o dist
+      - name: The package must contain the native library
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist/*.nupkg | Select-Object -First 1
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          $native = $archive.Entries | Where-Object { $_.FullName -like 'runtimes/*/native/*' }
+          $archive.Dispose()
+          if (-not $native) { throw "the package has no runtimes/<rid>/native/ entry" }
+          $native | ForEach-Object { Write-Host $_.FullName }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: dist/*.nupkg

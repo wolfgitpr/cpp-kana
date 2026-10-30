@@ -1,0 +1,26 @@
+# Namespace-level names of cpp_kana::v2 in the public headers (types and free functions).
+# Names containing detail/impl/internal are not part of the surface and are not listed here.
+CasePolicy
+Code
+Conversion
+Error
+ErrorException
+HatsuonPolicy
+KanaOptions
+LongVowelPolicy
+Mora
+MoraKind
+Outcome
+RomajiOptions
+Script
+SeparatorPolicy
+SokuonPolicy
+UnknownPolicy
+codeText
+codepointsToUtf8
+convertScript
+isValidUtf8
+kanaToRomaji
+romajiToKana
+utf8ToCodepoints
+version
