@@ -63,6 +63,15 @@
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
+  <!--
+    Every platform's native library, laid out by the release workflow as runtimes/<rid>/native/<library>.
+    A package carrying only win-x64 restores on Linux and then fails at the first P/Invoke; carrying one
+    directory per RID means a C# project anywhere gets the same CppKana2 version and the right library.
+  -->
+  <ItemGroup Condition="Exists('runtimes')">
+    <None Include="runtimes/**" Pack="true" PackagePath="runtimes/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(CppKana2Rid)' != '' and '$(CppKana2NativeDir)' != ''">
     <None Include="$(CppKana2NativeDir)\*cpp-kana2.dll" Pack="true" PackagePath="runtimes/$(CppKana2Rid)/native/" />
     <None Include="$(CppKana2NativeDir)\*cpp-kana2.so" Pack="true" PackagePath="runtimes/$(CppKana2Rid)/native/" />

@@ -1,0 +1,232 @@
+# Release: build a wheel on every platform, check each one as a file, and publish.
+#
+# Modelled on cpp-pinyin's release_prep.yml, adopted rather than copied: the shape that matters is
+#   * Linux wheels are built INSIDE quay.io/pypa/manylinux_2_28_<arch>, because a wheel built on a modern
+#     distribution cannot honestly claim a manylinux tag;
+#   * x86_64 and aarch64 are separate runners (ubuntu-latest / ubuntu-24.04-arm), not one emulated job;
+#   * every platform's wheel goes through tools/check_wheel.py before it is uploaded, so a py3-none-any tag or
+#     an empty _native/ fails here rather than at pip install time.
+#
+# This package's wheel is `py3-none-<platform>`: no extension module, so ONE wheel per platform serves every
+# Python 3 version -- that is what makes "multi-version Python" a matrix of 3 runners instead of a matrix of
+# dozens.
+#
+# Publishing is a manual dispatch with publish=true, never a side effect of pushing a tag: the artifacts are
+# reviewed first, and a missing repository secret should stop a dispatch, not turn a release tag red.
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload the built artifacts to PyPI and NuGet"
+        type: boolean
+        default: false
+  push:
+    tags: ["2.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  wheels-linux:
+    name: Linux wheel (${{ matrix.arch }})
+    # The container builds the library, the wheel and its own check; 45 minutes is generous and bounded.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+            image: quay.io/pypa/manylinux_2_28_x86_64
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, stage, package and check inside the manylinux image
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/work -w /work ${{ matrix.image }} /bin/bash -lc '
+              set -euo pipefail
+              # The image ships several Pythons; pick the one pip belongs to and make sure setuptools and wheel
+              # are present, because the wheel is built with --no-build-isolation and fetches nothing.
+              python3 -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+              cmake --version | head -1
+              g++ --version | head -1
+              python3 python/tools/build_native.py --build-dir build-linux
+              python3 -m pip wheel ./python --no-build-isolation --no-deps -w dist
+              python3 tools/check_wheel.py --wheel "$(ls dist/*.whl | head -1)"
+              # The wheel must load and answer, not just exist.
+              python3 -m pip install --no-deps --target /tmp/installed dist/*.whl
+              PYTHONPATH=/tmp/installed python3 -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
+            '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-${{ matrix.arch }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  wheel-windows:
+    name: Windows wheel (win_amd64)
+    timeout-minutes: 45
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling
+        run: python -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+      - name: Build, stage, package and check
+        run: |
+          python python/tools/build_native.py --build-dir build-win
+          python -m pip wheel ./python --no-build-isolation --no-deps -w dist
+          python -c "import glob,subprocess,sys; sys.exit(subprocess.call([sys.executable,'tools/check_wheel.py','--wheel',sorted(glob.glob('dist/*.whl'))[0]]))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-windows
+          path: dist/*.whl
+          if-no-files-found: error
+
+  wheel-macos:
+    name: macOS wheel (${{ matrix.arch }})
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x86_64
+            runner: macos-13
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling
+        run: python -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+      - name: Build, stage, package and check
+        run: |
+          python python/tools/build_native.py --build-dir build-macos
+          python -m pip wheel ./python --no-build-isolation --no-deps -w dist
+          python tools/check_wheel.py --wheel "$(ls dist/*.whl | head -1)"
+          python -m pip install --no-deps --target /tmp/installed dist/*.whl
+          PYTHONPATH=/tmp/installed python -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji('きって').rendered == 'kitte'; print('import ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-macos-${{ matrix.arch }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: Source distribution
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the sdist and validate both metadata and README rendering
+        run: |
+          python -m pip install --quiet --disable-pip-version-check build twine
+          python -m build --sdist --outdir dist
+          python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  nupkg:
+    name: NuGet package (all RIDs)
+    # One package carrying every platform's native library, so a C# project on any of them restores the same
+    # CppKana2 version. RIDs without a library are simply absent, which NuGet reports at restore time instead
+    # of at first P/Invoke.
+    timeout-minutes: 45
+    needs: [wheels-linux, wheel-windows, wheel-macos]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Unpack each wheel's native library into its runtimes/<rid>/native
+        shell: pwsh
+        run: |
+          $map = @{
+            "wheel-windows"            = "win-x64"
+            "wheel-linux-x86_64"       = "linux-x64"
+            "wheel-linux-aarch64"      = "linux-arm64"
+            "wheel-macos-arm64"        = "osx-arm64"
+            "wheel-macos-x86_64"       = "osx-x64"
+          }
+          # Laid out exactly where the csproj packs from: runtimes/<rid>/native/<library>.
+          $native = "csharp/CppKana2/runtimes"
+          New-Item -ItemType Directory -Force $native | Out-Null
+          foreach ($name in $map.Keys) {
+            $wheel = Get-ChildItem "artifacts/$name/*.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $wheel) { throw "$name produced no wheel" }
+            $target = Join-Path $native (Join-Path $map[$name] "native")
+            New-Item -ItemType Directory -Force $target | Out-Null
+            Expand-Archive -Path $wheel.FullName -DestinationPath (Join-Path $native "unpacked-$name")
+            Get-ChildItem (Join-Path $native "unpacked-$name/cpp_kana2/_native") |
+              Where-Object { $_.Extension -in ".dll", ".so", ".dylib" } |
+              Copy-Item -Destination $target
+            Remove-Item -Recurse -Force (Join-Path $native "unpacked-$name")
+          }
+          Get-ChildItem $native -Recurse -File | ForEach-Object { "{0} <- {1}" -f $_.FullName, ($_.Length) }
+      - name: Pack with every runtime in place
+        shell: pwsh
+        run: |
+          # No CppKana2NativeDir here on purpose: the runtimes/ tree above is the whole surface, so the package
+          # contains exactly the platforms whose wheels were built in the jobs this one waits for.
+          dotnet pack csharp/CppKana2/CppKana2.csproj -c Release -o dist
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: dist/*.nupkg
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: [wheels-linux, wheel-windows, wheel-macos, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "*"
+          merge-multiple: true
+      - name: List what is about to be published
+        run: ls -l dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  publish-nuget:
+    name: Publish to NuGet
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: nupkg
+    runs-on: windows-latest
+    environment: nuget
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nupkg
+          path: dist
+      - name: Push the package
+        shell: pwsh
+        run: dotnet nuget push dist/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
