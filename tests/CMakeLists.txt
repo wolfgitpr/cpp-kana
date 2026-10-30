@@ -80,6 +80,7 @@ set(CPP_KANA2_GATES
         check_version_tokens
         check_data_tables
         check_conformance
+        check_wheel
         check_doc_links
         check_doc_citations
         check_gate_inventory)
