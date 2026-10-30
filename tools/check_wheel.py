@@ -123,7 +123,17 @@ def main() -> int:
     if args.wheel:
         wheel = args.wheel
     else:
-        staging = ROOT / ".tmp" / "wheel-check"
+        # Without a wheel named, this gate builds one -- and building one requires the native library to have
+        # been staged by python/tools/build_native.py. On a compiler-only machine (and in the ctest leg of CI,
+        # which compiles the library but does not stage the Python package) there is nothing to stage from, and
+        # a gate that fails for that reason would be reporting the environment, not the package. MEASURED: this
+        # exact failure turned the first real CI run red with "metadata-generation-failed".
+        staging = ROOT / "python" / "cpp_kana2" / "_native"
+        if not staging.is_dir() or not any(staging.iterdir()):
+            print("check_wheel: NOTE -- no staged native library (python/cpp_kana2/_native is empty); "
+                  "nothing to package here, run python/tools/build_native.py to exercise this gate")
+            return 0
+        directory = ROOT / ".tmp" / "wheel-check"
         staging.mkdir(parents=True, exist_ok=True)
         for stale in staging.glob("*.whl"):
             stale.unlink()
