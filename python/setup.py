@@ -18,6 +18,7 @@ Measured recipe:
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +39,14 @@ def _version() -> str:
 
 
 def _platform_tag() -> str:
+    # An explicit override for the case the derivation below cannot see: a wheel built on one machine and
+    # folded into a release for another (the manylinux container on the board, a cross build). Same rule as
+    # the derivation -- never "any", because the archive carries native code.
+    override = os.environ.get("CPP_KANA2_PLATFORM_TAG", "").strip()
+    if override:
+        if override == "any":
+            raise SystemExit("CPP_KANA2_PLATFORM_TAG=any is forbidden: the wheel carries a native library")
+        return override
     if sys.platform == "win32":
         return "win_amd64" if sys.maxsize > 2**32 else "win32"
     if sys.platform == "darwin":
