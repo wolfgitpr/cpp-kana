@@ -51,7 +51,19 @@ namespace cpp_kana::v2
 
     /// Thrown by `Outcome::value()` when the outcome is a failure. A failed call that the caller never asks
     /// about itself throws nothing: the failure is the returned value.
-    class CPP_KANA2_EXPORT ErrorException : public std::runtime_error {
+    // MSVC's C4251/C4275: an exported class that holds std:: members, or derives from a std:: type, triggers a
+// warning that is about a real hazard in general -- two different STL versions across the boundary -- and a
+// false alarm here, because this library and its consumer are expected to be built with the same toolchain and
+// the same C++ standard library (the ABI note in docs/STABILITY.md says so, and the C ABI exists precisely for
+// callers that cannot promise that). Suppressing them is a statement about the promise, not a silencing of the
+// diagnostic: the moment the promise changes, this block is the thing to revisit.
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4251) // std::string / std::vector member of an exported class
+#pragma warning(disable : 4275) // exported class deriving from a non-exported (std) class
+#endif
+
+class CPP_KANA2_EXPORT ErrorException : public std::runtime_error {
     public:
         explicit ErrorException(Error error);
 
@@ -60,6 +72,10 @@ namespace cpp_kana::v2
     private:
         Error m_error;
     };
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
     namespace detail
     {

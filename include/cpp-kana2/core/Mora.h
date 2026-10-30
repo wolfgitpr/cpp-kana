@@ -55,7 +55,19 @@ namespace cpp_kana::v2
     /// A conversion result: the whole rendered string plus the per-unit breakdown behind it.
     ///
     /// Copyable and movable; both directions of a conversion produce one of these.
-    class CPP_KANA2_EXPORT Conversion {
+    // MSVC's C4251/C4275: an exported class that holds std:: members, or derives from a std:: type, triggers a
+// warning that is about a real hazard in general -- two different STL versions across the boundary -- and a
+// false alarm here, because this library and its consumer are expected to be built with the same toolchain and
+// the same C++ standard library (the ABI note in docs/STABILITY.md says so, and the C ABI exists precisely for
+// callers that cannot promise that). Suppressing them is a statement about the promise, not a silencing of the
+// diagnostic: the moment the promise changes, this block is the thing to revisit.
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4251) // std::string / std::vector member of an exported class
+#pragma warning(disable : 4275) // exported class deriving from a non-exported (std) class
+#endif
+
+class CPP_KANA2_EXPORT Conversion {
     public:
         Conversion() = default;
         Conversion(std::string text, std::vector<Mora> moras, std::string separator = {});
@@ -83,6 +95,10 @@ namespace cpp_kana::v2
         std::vector<Mora> m_moras;
         std::string m_separator;
     };
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 } // namespace cpp_kana::v2
 
