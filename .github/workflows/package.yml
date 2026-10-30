@@ -18,7 +18,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # macOS included: its platform tag is derived from the same build_native.py + setup.py path, and the
+        # only way to know the wheel loads there is to build it there.
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,8 +33,10 @@ jobs:
         run: python python/tools/build_native.py
       - name: Build the wheel
         run: python -m pip wheel ./python --no-build-isolation --no-deps -w dist
-      - name: Show the wheel tag
-        run: python -c "import pathlib; print([p.name for p in pathlib.Path('dist').iterdir()])"
+      # Checking the archive, not the build: this is what catches a py3-none-any tag or an empty _native/.
+      # Locating the file is done in Python so the step is identical on every runner and shell.
+      - name: Check the wheel as a file
+        run: python -c "import glob,subprocess,sys; sys.exit(subprocess.call([sys.executable,'tools/check_wheel.py','--wheel',sorted(glob.glob('dist/*.whl'))[0]]))"
       - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ runner.os }}
