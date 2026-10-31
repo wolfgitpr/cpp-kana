@@ -97,8 +97,12 @@ jobs:
               # claimed ("not a supported wheel on this platform", run 41171692045), and that is a pip policy
               # question, not a question about whether the library loads.
               rm -rf /tmp/installed && mkdir -p /tmp/installed
+              # `zipfile -e` writes the archive contents under the target directory; the package directory is at
+              # the archive root, so the target is what has to be on sys.path. ls first: the failure on run
+              # 41171968336 was ModuleNotFoundError with nothing to show what had been unpacked.
               "$PY" -m zipfile -e "$WHEEL" /tmp/installed
-              PYTHONPATH=/tmp/installed "$PY" -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
+              ls /tmp/installed
+              cd /tmp/installed && PYTHONPATH=/tmp/installed "$PY" -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
             '
       - uses: actions/upload-artifact@v4
         with:
