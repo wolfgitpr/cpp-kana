@@ -52,19 +52,27 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD":/work -w /work ${{ matrix.image }} /bin/bash -lc '
               set -euo pipefail
-              # The image ships several Pythons; pick the one pip belongs to and make sure setuptools and wheel
-              # are present, because the wheel is built with --no-build-isolation and fetches nothing.
-              python3 -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+              # The image ships several Pythons under /opt/python and its SYSTEM python3 has no pip at all.
+              # MEASURED on release run 41170738812: "/usr/bin/python3: No module named pip". Pick a real
+              # interpreter first, then everything else uses it.
+              PY=""
+              for candidate in /opt/python/cp312*/bin/python3 /opt/python/cp311*/bin/python3 /opt/python/cp310*/bin/python3; do
+                if [ -x "$candidate" ]; then PY="$candidate"; break; fi
+              done
+              if [ -z "$PY" ]; then echo "no usable python under /opt/python"; exit 1; fi
+              "$PY" --version
+              "$PY" -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
               # No `| head -1` here: with `set -euo pipefail`, head closing the pipe makes the pipeline exit 141 and
               # the whole build step fails with no message. MEASURED on the first release run: exactly that.
               cmake --version
               g++ --version
-              python3 python/tools/build_native.py --build-dir build-linux
-              python3 -m pip wheel ./python --no-build-isolation --no-deps -w dist
-              python3 tools/check_wheel.py --wheel "$(ls dist/*.whl | head -1)"
+              "$PY" python/tools/build_native.py --build-dir build-linux
+              "$PY" -m pip wheel ./python --no-build-isolation --no-deps -w dist
+              WHEEL=$(ls dist/*.whl)
+              "$PY" tools/check_wheel.py --wheel "$WHEEL"
               # The wheel must load and answer, not just exist.
-              python3 -m pip install --no-deps --target /tmp/installed dist/*.whl
-              PYTHONPATH=/tmp/installed python3 -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
+              "$PY" -m pip install --no-deps --target /tmp/installed "$WHEEL"
+              PYTHONPATH=/tmp/installed "$PY" -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
             '
       - uses: actions/upload-artifact@v4
         with:
