@@ -206,31 +206,41 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Unpack each wheel's native library into its runtimes/<rid>/native
+      - name: Unpack each wheel native library into runtimes/<rid>/native
         shell: pwsh
         run: |
-          $map = @{
-            "wheel-windows"            = "win-x64"
-            "wheel-linux-x86_64"       = "linux-x64"
-            "wheel-linux-aarch64"      = "linux-arm64"
-            "wheel-macos-arm64"        = "osx-arm64"
-            "wheel-macos-x86_64"       = "osx-x64"
+          $root = (Get-Location).Path
+          $map = [ordered]@{
+            "wheel-windows"       = "win-x64"
+            "wheel-linux-x86_64"  = "linux-x64"
+            "wheel-linux-aarch64" = "linux-arm64"
+            "wheel-macos-arm64"   = "osx-arm64"
+            "wheel-macos-x86_64"  = "osx-x64"
           }
-          # Laid out exactly where the csproj packs from: runtimes/<rid>/native/<library>.
-          $native = "csharp/CppKana2/runtimes"
+          $native = Join-Path $root "csharp/CppKana2/runtimes"
           New-Item -ItemType Directory -Force $native | Out-Null
           foreach ($name in $map.Keys) {
-            $wheel = Get-ChildItem "artifacts/$name/*.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $wheel) { throw "$name produced no wheel" }
+            $wheel = Get-ChildItem (Join-Path $root "artifacts/$name") -Filter *.whl -Recurse |
+              Select-Object -First 1
+            if (-not $wheel) { throw "$name produced no wheel under artifacts/$name" }
+            $staging = Join-Path $native "unpacked-$name"
             $target = Join-Path $native (Join-Path $map[$name] "native")
+            New-Item -ItemType Directory -Force $staging | Out-Null
             New-Item -ItemType Directory -Force $target | Out-Null
-            Expand-Archive -Path $wheel.FullName -DestinationPath (Join-Path $native "unpacked-$name")
-            Get-ChildItem (Join-Path $native "unpacked-$name/cpp_kana2/_native") |
+            # tar, not python and not Expand-Archive: bsdtar ships with the Windows runner and extracts a zip
+            # whatever it is called, so neither python quoting nor archive extensions can break this step.
+            # MEASURED: python -m zipfile with relative paths left an empty staging directory (run 41181262856).
+            tar -xf $wheel.FullName -C $staging
+            if ($LASTEXITCODE -ne 0) { throw "tar could not extract $($wheel.Name)" }
+            $unpacked = Join-Path $staging "cpp_kana2/_native"
+            if (-not (Test-Path $unpacked)) { throw "$($wheel.Name) has no cpp_kana2/_native after extraction" }
+            Get-ChildItem $unpacked |
               Where-Object { $_.Extension -in ".dll", ".so", ".dylib" } |
               Copy-Item -Destination $target
             Remove-Item -Recurse -Force $staging
           }
-          Get-ChildItem $native -Recurse -File | ForEach-Object { "{0} <- {1}" -f $_.FullName, ($_.Length) }
+          Get-ChildItem $native -Recurse -File | ForEach-Object { $_.FullName.Replace($root, "") }
+
       - name: Pack with every runtime in place
         shell: pwsh
         run: |
