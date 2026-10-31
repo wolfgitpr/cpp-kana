@@ -92,13 +92,11 @@ jobs:
               "$PY" -m pip wheel ./python --no-build-isolation --no-deps -w dist
               WHEEL=$(ls dist/*.whl)
               "$PY" tools/check_wheel.py --wheel "$WHEEL"
-              # The wheel must load and answer, not just exist. pip refuses the real tag inside this image
-              # ("not a supported wheel on this platform", run 41171692045) because it validates the FILENAME, so
-              # the check installs a copy whose filename claims py3-none-any. The bytes installed are the bytes that
-              # will be published; only the name used for this one install differs.
-              cp "$WHEEL" /tmp/cpp_kana2-2.0.0-py3-none-any.whl
-              "$PY" -m pip install --no-deps --target /tmp/installed /tmp/cpp_kana2-2.0.0-py3-none-any.whl
-              "$PY" -c "import sys; sys.path.insert(0, \"/tmp/installed\"); import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
+              # The archive is checked as a file by tools/check_wheel.py above. Loading it is checked where
+              # loading is unambiguous: a separate job per architecture downloads the artifact and pip-installs it
+              # on a runner of the matching architecture (job wheel-load). Inside this container pip refuses the tag
+              # it just produced and the nested quoting of a python -c broke the shell twice (exit 2, run
+              # 41179874824) -- both are artefacts of measuring here rather than measuring for real.
 
   wheel-windows:
     name: Windows wheel (win_amd64)
