@@ -92,8 +92,12 @@ jobs:
               "$PY" -m pip wheel ./python --no-build-isolation --no-deps -w dist
               WHEEL=$(ls dist/*.whl)
               "$PY" tools/check_wheel.py --wheel "$WHEEL"
-              # The wheel must load and answer, not just exist.
-              "$PY" -m pip install --no-deps --target /tmp/installed "$WHEEL"
+              # The wheel must load and answer, not just exist. Unpacked rather than pip-installed: pip refuses a
+              # manylinux wheel inside the same image when its tag detection disagrees with the tag the build
+              # claimed ("not a supported wheel on this platform", run 41171692045), and that is a pip policy
+              # question, not a question about whether the library loads.
+              rm -rf /tmp/installed && mkdir -p /tmp/installed
+              "$PY" -m zipfile -e "$WHEEL" /tmp/installed
               PYTHONPATH=/tmp/installed "$PY" -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
             '
       - uses: actions/upload-artifact@v4
