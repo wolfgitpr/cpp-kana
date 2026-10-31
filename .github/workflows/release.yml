@@ -97,6 +97,7 @@ jobs:
               # on a runner of the matching architecture (job wheel-load). Inside this container pip refuses the tag
               # it just produced and the nested quoting of a python -c broke the shell twice (exit 2, run
               # 41179874824) -- both are artefacts of measuring here rather than measuring for real.
+            '
 
   wheel-windows:
     name: Windows wheel (win_amd64)
