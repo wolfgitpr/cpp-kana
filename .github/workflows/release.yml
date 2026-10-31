@@ -232,16 +232,18 @@ jobs:
             # MEASURED: python -m zipfile with relative paths left an empty staging directory (run 41181262856).
             tar -xf $wheel.FullName -C $staging
             if ($LASTEXITCODE -ne 0) { throw "tar could not extract $($wheel.Name)" }
-            $unpacked = Join-Path $staging "cpp_kana2/_native"
-            if (-not (Test-Path $unpacked)) {
-              # Show what IS there: the last three runs each failed with a one-line guess, and a guess is what the
-              # next reader has to re-derive. MEASURED: run 41181643834 threw here for the Windows wheel.
+            # Recursive, because setuptools writes the package under <name>.data/purelib/ in a wheel built with
+            # package_data and include_package_data. MEASURED (run 41182003603): the library inside the wheel is at
+            # cpp_kana2-2.0.0.data/purelib/cpp_kana2/_native/libcpp-kana2.dll, not at the archive root.
+            $nativeDir = Get-ChildItem $staging -Recurse -Directory -Filter "_native" |
+              Select-Object -First 1
+            if (-not $nativeDir) {
               Write-Host "extracted tree of $($wheel.Name):"
               Get-ChildItem $staging -Recurse -Force | Select-Object -First 40 |
                 ForEach-Object { $_.FullName.Replace($root, "") } | Out-String | Write-Host
-              throw "$($wheel.Name) has no cpp_kana2/_native after extraction"
+              throw "$($wheel.Name) contains no _native directory"
             }
-            Get-ChildItem $unpacked |
+            Get-ChildItem $nativeDir.FullName |
               Where-Object { $_.Extension -in ".dll", ".so", ".dylib" } |
               Copy-Item -Destination $target
             Remove-Item -Recurse -Force $staging
