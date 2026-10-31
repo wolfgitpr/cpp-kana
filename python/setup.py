@@ -54,11 +54,18 @@ def _platform_tag() -> str:
 
         machine = platform.machine().lower()
         return "macosx_11_0_arm64" if machine in {"arm64", "aarch64"} else "macosx_10_15_x86_64"
-    machine = "aarch64" if sys.maxsize > 2**32 and sys.platform.startswith("linux") else "x86_64"
     import platform
 
-    if platform.machine().lower() in {"aarch64", "arm64"}:
+    # The machine, not the pointer width. MEASURED (run 41183495758): the x86_64 manylinux job produced a wheel
+    # named manylinux_2_28_aarch64, because "any 64-bit Linux is aarch64" was the previous rule and the override
+    # below could only ever confirm it. Both Linux wheels then claimed the same architecture.
+    machine = platform.machine().lower()
+    if machine in {"aarch64", "arm64"}:
         machine = "aarch64"
+    elif machine in {"x86_64", "amd64"}:
+        machine = "x86_64"
+    else:
+        raise SystemExit(f"cannot map platform.machine()={machine!r} to a manylinux architecture")
     # manylinux_2_28 is deliberately conservative: the CI leg builds inside a manylinux_2_28 container, and
     # claiming a lower floor than the toolchain emits is how a wheel installs and then refuses to start.
     return f"manylinux_2_28_{machine}"

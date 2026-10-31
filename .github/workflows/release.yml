@@ -97,6 +97,15 @@ jobs:
               # on a runner of the matching architecture (job wheel-load). Inside this container pip refuses the tag
               # it just produced and the nested quoting of a python -c broke the shell twice (exit 2, run
               # 41179874824) -- both are artefacts of measuring here rather than measuring for real.
+
+      # The upload step was lost in an earlier edit of this file (it disappeared with the block that was being
+      # removed, and nothing noticed because the job still passed). Without it the two Linux wheels never reach the
+      # run's artifacts -- MEASURED, run 41183495758: five artifacts, none of them Linux.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-${{ matrix.arch }}
+          path: dist/*.whl
+          if-no-files-found: error
             '
 
   wheel-windows:
