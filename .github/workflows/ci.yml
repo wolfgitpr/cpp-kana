@@ -66,7 +66,10 @@ jobs:
           # Leak detection is on by default under ASan; keep it on so a leaked conversion fails the run.
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: ctest --preset sanitize
+        # --output-on-failure is not decoration here: two runs in a row reported two failed tests on this leg
+        # with no output at all, because it was the only leg invoking ctest without it. A red run nobody can
+        # read costs a full CI cycle per hypothesis.
+        run: ctest --preset sanitize --output-on-failure
 
   linux-static:
     name: Linux / static library
