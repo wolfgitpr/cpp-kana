@@ -144,6 +144,13 @@ else()
 endif()
 execute_process(
         COMMAND "${CMAKE_COMMAND}" -E env "PATH=${RUNTIME_DIRS}${SEPARATOR}$ENV{PATH}"
+                # A sanitizer build installs an INSTRUMENTED library, and a consumer that is built and linked
+                # with the sanitizer still fails ASan's link-order check when the runtime is not the first
+                # entry in the process's library list -- the normal outcome for a ctest child that loads the
+                # library through its rpath. verify_asan_link_order exists for exactly that arrangement;
+                # without it the gate reports a broken install that is not broken. MEASURED on the sanitize
+                # leg: "ASan runtime does not come first in initial library list", three runs in a row.
+                "ASAN_OPTIONS=verify_asan_link_order=0:detect_leaks=0"
                 "${CONSUMER}/build/consumer"
         RESULT_VARIABLE RUN_STATUS OUTPUT_VARIABLE RUN_OUTPUT ERROR_VARIABLE RUN_OUTPUT)
 if(NOT RUN_STATUS EQUAL 0)
