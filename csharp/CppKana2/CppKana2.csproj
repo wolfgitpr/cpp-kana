@@ -78,7 +78,12 @@
     <None Include="$(CppKana2NativeDir)\*cpp-kana2.dylib" Pack="true" PackagePath="runtimes/$(CppKana2Rid)/native/" />
   </ItemGroup>
 
-  <Target Name="CppKana2PackRequiresInputs" BeforeTargets="GenerateNuspec">
+  <!--
+    A release package is packed from a runtimes/ tree that already holds every platform (the release workflow
+    unpacks each wheel into it), so the single-RID inputs below are only required when that tree is absent.
+  -->
+  <Target Name="CppKana2PackRequiresInputs" BeforeTargets="GenerateNuspec"
+          Condition="!Exists('runtimes')">
     <Error Condition="'$(CppKana2Rid)' == ''"
            Text="CppKana2Rid is required to pack: pass -p:CppKana2Rid=win-x64 (or linux-x64 / osx-arm64 / ...)." />
     <Error Condition="'$(CppKana2NativeDir)' == ''"
