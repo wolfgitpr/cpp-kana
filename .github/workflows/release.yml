@@ -76,9 +76,13 @@ jobs:
               # Whatever pip managed, the build needs a ninja on PATH; auditwheel? no -- ninja only.
               if ! command -v ninja >/dev/null 2>&1; then
                 echo "ninja missing after pip; trying the system package manager"
-                dnf -y install ninja-build >/dev/null || yum -y install ninja-build >/dev/null || true
+
               fi
-              command -v ninja && ninja --version
+              # If no ninja can be obtained without root (dnf needs it, and the container runs as the runner user),
+              # fall back to the image make, which is always there. MEASURED: dnf refused with "superuser
+              # privileges" on runs 41170998959..41171417852.
+              if ! command -v ninja >/dev/null 2>&1; then export CPP_KANA2_CMAKE_GENERATOR="Unix Makefiles"; fi
+              echo "generator: ${CPP_KANA2_CMAKE_GENERATOR:-Ninja}"
               command -v cmake && cmake --version
               # No `| head -1` here: with `set -euo pipefail`, head closing the pipe makes the pipeline exit 141 and
               # the whole build step fails with no message. MEASURED on the first release run: exactly that.

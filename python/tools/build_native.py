@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -72,7 +73,10 @@ def build(build_dir: Path, config: str) -> Path:
         "-B",
         str(build_dir),
         "-G",
-        "Ninja",
+        # Ninja by default, but overridable: a manylinux image can be missing the ninja binary while its make
+        # works, and forcing a generator there turns a missing tool into a failed release. MEASURED on release
+        # runs 41170998959..41171417852.
+        os.environ.get("CPP_KANA2_CMAKE_GENERATOR", "Ninja"),
         f"-DCMAKE_BUILD_TYPE={config}",
         "-DBUILD_SHARED_LIBS=ON",
         "-DCPP_KANA2_BUILD_TESTS=OFF",
