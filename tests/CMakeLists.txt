@@ -51,7 +51,19 @@ set_tests_properties(CapiSmoke PROPERTIES LABELS "unit")
 # ----------------------------------
 
 add_executable(cpp-kana2-conformance ${CMAKE_SOURCE_DIR}/tools/conformance_emit.cpp)
-target_link_libraries(cpp-kana2-conformance PRIVATE cpp-kana2::cpp-kana2)
+# dev_flags, not just the library: under CPP_KANA2_SANITIZE the library is instrumented, and an executable
+# linked against an instrumented library but built without the sanitizer runtimes dies at load time with
+# "ASan runtime does not come first in initial library list". MEASURED: that was ConformanceFixture failing in
+# 0.00s on the sanitize leg, and nothing showed it until --output-on-failure was added.
+target_link_libraries(cpp-kana2-conformance PRIVATE cpp-kana2::cpp-kana2 cpp-kana2_dev_flags)
+
+# What a consumer of an instrumented library must link in order to load it. Empty in a normal build; the
+# install-consumer gate forwards it, because the sanitizer flags live on an interface target and therefore never
+# appear in CMAKE_CXX_FLAGS.
+set(CPP_KANA2_CONSUMER_SANITIZER_FLAGS "")
+if (CPP_KANA2_SANITIZE)
+    set(CPP_KANA2_CONSUMER_SANITIZER_FLAGS "-fsanitize=address,undefined")
+endif()
 
 add_test(NAME ConformanceFixture
         COMMAND cpp-kana2-conformance
@@ -157,7 +169,7 @@ if (CPP_KANA2_INSTALL)
                     -DWORK_DIR=${CMAKE_BINARY_DIR}/install-consumer
                     -DGENERATOR=${CMAKE_GENERATOR}
                     -DCOMPILER=${CMAKE_CXX_COMPILER}
-                    -DCXX_FLAGS=${CMAKE_CXX_FLAGS}
+                    -DCXX_FLAGS=${CMAKE_CXX_FLAGS} ${CPP_KANA2_CONSUMER_SANITIZER_FLAGS}
                     -DEXE_LINK_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
                     -P ${CMAKE_SOURCE_DIR}/tests/install/check_install_consumer.cmake)
     set_tests_properties(Gate_InstallConsumer PROPERTIES LABELS "gate")

@@ -102,11 +102,14 @@ endif()
 # gate red for a reason that has nothing to do with the installed package. MEASURED: that is exactly what
 # happened on the first real CI run (Gate_InstallConsumer, 0.56s).
 if(DEFINED CXX_FLAGS AND NOT CXX_FLAGS STREQUAL "")
-    string(REGEX REPLACE "-f(no-)?sanitize=[^ ]*" "" _consumer_cxx_flags "${CXX_FLAGS}")
-    string(STRIP "${_consumer_cxx_flags}" _consumer_cxx_flags)
-    if(NOT _consumer_cxx_flags STREQUAL "")
-        list(APPEND CONSUMER_COMPILER_ARGS "-DCMAKE_CXX_FLAGS=${_consumer_cxx_flags}")
-    endif()
+    # Sanitizer flags travel WITH the toolchain flags, and that is the correction of an earlier mistake: I
+    # stripped them first, measured the installed library still instrumented, and the consumer then died at load
+    # time with "ASan runtime does not come first in initial library list" -- the consumer must be built with the
+    # sanitizer the library it loads was built with. The failure the stripping was meant to fix was the same one.
+    # The library under test may be instrumented while CMAKE_CXX_FLAGS carries no sanitizer flag (the sanitizer
+    # travels on the cpp-kana2_sanitizers interface target), so the caller appends what a consumer must link to
+    # load such a library. Empty in a normal build.
+    list(APPEND CONSUMER_COMPILER_ARGS "-DCMAKE_CXX_FLAGS=${CXX_FLAGS} ${CPP_KANA2_CONSUMER_SANITIZER_FLAGS}")
 endif()
 if(DEFINED EXE_LINK_FLAGS AND NOT EXE_LINK_FLAGS STREQUAL "")
     list(APPEND CONSUMER_COMPILER_ARGS "-DCMAKE_EXE_LINKER_FLAGS=${EXE_LINK_FLAGS}")
