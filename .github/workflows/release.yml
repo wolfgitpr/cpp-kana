@@ -102,7 +102,11 @@ jobs:
               # 41171968336 was ModuleNotFoundError with nothing to show what had been unpacked.
               "$PY" -m zipfile -e "$WHEEL" /tmp/installed
               ls /tmp/installed
-              cd /tmp/installed && PYTHONPATH=/tmp/installed "$PY" -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
+              # sys.path is set inside the interpreter rather than through PYTHONPATH: the environment variable was
+              # not reaching the child in this container (ModuleNotFoundError on runs 41171968336 and 41172257542,
+              # with the package visibly unpacked next to it). Explicit is measurable; an inherited env var here was
+              # not.
+              "$PY" -c "import sys; sys.path.insert(0, \"/tmp/installed\"); import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
             '
       - uses: actions/upload-artifact@v4
         with:
