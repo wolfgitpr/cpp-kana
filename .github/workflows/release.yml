@@ -224,7 +224,7 @@ jobs:
             Get-ChildItem (Join-Path $native "unpacked-$name/cpp_kana2/_native") |
               Where-Object { $_.Extension -in ".dll", ".so", ".dylib" } |
               Copy-Item -Destination $target
-            Remove-Item -Recurse -Force (Join-Path $native "unpacked-$name")
+            Remove-Item -Recurse -Force $staging
           }
           Get-ChildItem $native -Recurse -File | ForEach-Object { "{0} <- {1}" -f $_.FullName, ($_.Length) }
       - name: Pack with every runtime in place
