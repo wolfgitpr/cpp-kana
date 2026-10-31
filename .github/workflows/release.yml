@@ -64,8 +64,22 @@ jobs:
               # find them. MEASURED on release run 41170998959: "CMake was unable to find a build program
               # corresponding to Ninja" plus "CMAKE_CXX_COMPILER not set".
               export PATH="$(dirname "$PY"):$PATH"
+              # manylinux_2_28 keeps its compiler in a gcc-toolset? then it is not on PATH until enabled, which is
+              # what "CMAKE_CXX_COMPILER not set" meant. MEASURED on runs 41170998959 and 41171179112.
+              for toolset in /opt/rh/gcc-toolset-*/enable; do
+                if [ -f "$toolset" ]; then . "$toolset"; break; fi
+              done
               "$PY" --version
-              "$PY" -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+              command -v g++ || true
+              g++ --version || true
+              "$PY" -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja || true
+              # Whatever pip managed, the build needs a ninja on PATH; auditwheel? no -- ninja only.
+              if ! command -v ninja >/dev/null 2>&1; then
+                echo "ninja missing after pip; trying the system package manager"
+                dnf -y install ninja-build >/dev/null || yum -y install ninja-build >/dev/null || true
+              fi
+              command -v ninja && ninja --version
+              command -v cmake && cmake --version
               # No `| head -1` here: with `set -euo pipefail`, head closing the pipe makes the pipeline exit 141 and
               # the whole build step fails with no message. MEASURED on the first release run: exactly that.
               cmake --version
