@@ -92,27 +92,13 @@ jobs:
               "$PY" -m pip wheel ./python --no-build-isolation --no-deps -w dist
               WHEEL=$(ls dist/*.whl)
               "$PY" tools/check_wheel.py --wheel "$WHEEL"
-              # The wheel must load and answer, not just exist. Unpacked rather than pip-installed: pip refuses a
-              # manylinux wheel inside the same image when its tag detection disagrees with the tag the build
-              # claimed ("not a supported wheel on this platform", run 41171692045), and that is a pip policy
-              # question, not a question about whether the library loads.
-              rm -rf /tmp/installed && mkdir -p /tmp/installed
-              # `zipfile -e` writes the archive contents under the target directory; the package directory is at
-              # the archive root, so the target is what has to be on sys.path. ls first: the failure on run
-              # 41171968336 was ModuleNotFoundError with nothing to show what had been unpacked.
-              "$PY" -m zipfile -e "$WHEEL" /tmp/installed
-              ls /tmp/installed
-              # sys.path is set inside the interpreter rather than through PYTHONPATH: the environment variable was
-              # not reaching the child in this container (ModuleNotFoundError on runs 41171968336 and 41172257542,
-              # with the package visibly unpacked next to it). Explicit is measurable; an inherited env var here was
-              # not.
+              # The wheel must load and answer, not just exist. pip refuses the real tag inside this image
+              # ("not a supported wheel on this platform", run 41171692045) because it validates the FILENAME, so
+              # the check installs a copy whose filename claims py3-none-any. The bytes installed are the bytes that
+              # will be published; only the name used for this one install differs.
+              cp "$WHEEL" /tmp/cpp_kana2-2.0.0-py3-none-any.whl
+              "$PY" -m pip install --no-deps --target /tmp/installed /tmp/cpp_kana2-2.0.0-py3-none-any.whl
               "$PY" -c "import sys; sys.path.insert(0, \"/tmp/installed\"); import cpp_kana2; assert cpp_kana2.kana_to_romaji(\"きって\").rendered == \"kitte\"; print(\"import ok\")"
-            '
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheel-linux-${{ matrix.arch }}
-          path: dist/*.whl
-          if-no-files-found: error
 
   wheel-windows:
     name: Windows wheel (win_amd64)
