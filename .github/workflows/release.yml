@@ -232,10 +232,17 @@ jobs:
             # Match on the artifact directory name, then fall back to matching the wheel filename: the download
             # step's layout is not something this step should be guessing at twice. MEASURED: run 41182365297 threw
             # "wheel-linux-x86_64 produced no wheel under artifacts/wheel-linux-x86_64".
+            # No fallback. A fallback here means "use whichever wheel is at hand", and that is how a package
+            # whose linux-x64 and linux-arm64 entries contain a macOS .dylib got built and called green
+            # (MEASURED, run 41183495758: runtimes/linux-*/native/libcpp-kana2.dylib). A missing artifact is a
+            # missing platform, and the only honest outcome is to stop.
             $wheel = $allWheels | Where-Object { $_.FullName -match [regex]::Escape($name) } |
               Select-Object -First 1
-            if (-not $wheel) { $wheel = $allWheels | Select-Object -First 1 }
-            if (-not $wheel) { throw "$name produced no wheel" }
+            if (-not $wheel) {
+              Write-Host "wheel artifacts present:"
+              $allWheels | ForEach-Object { $_.FullName.Replace($root, "") } | Out-String | Write-Host
+              throw "artifact $name is missing; refusing to pack a package with a hole in it"
+            }
             $staging = Join-Path $native "unpacked-$name"
             $target = Join-Path $native (Join-Path $map[$name] "native")
             New-Item -ItemType Directory -Force $staging | Out-Null
