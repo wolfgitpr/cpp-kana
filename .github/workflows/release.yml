@@ -219,30 +219,34 @@ jobs:
           }
           $native = Join-Path $root "csharp/CppKana2/runtimes"
           New-Item -ItemType Directory -Force $native | Out-Null
+          $allWheels = Get-ChildItem (Join-Path $root "artifacts") -Recurse -Filter *.whl -ErrorAction SilentlyContinue
+          if (-not $allWheels) {
+            Write-Host "artifacts tree:"
+            Get-ChildItem (Join-Path $root "artifacts") -Recurse -Force |
+              ForEach-Object { $_.FullName.Replace($root, "") } | Out-String | Write-Host
+            throw "no wheel artifacts were downloaded"
+          }
+          Write-Host "wheel artifacts found:"
+          $allWheels | ForEach-Object { $_.FullName.Replace($root, "") } | Out-String | Write-Host
           foreach ($name in $map.Keys) {
-            $wheel = Get-ChildItem (Join-Path $root "artifacts/$name") -Filter *.whl -Recurse |
+            # Match on the artifact directory name, then fall back to matching the wheel filename: the download
+            # step's layout is not something this step should be guessing at twice. MEASURED: run 41182365297 threw
+            # "wheel-linux-x86_64 produced no wheel under artifacts/wheel-linux-x86_64".
+            $wheel = $allWheels | Where-Object { $_.FullName -match [regex]::Escape($name) } |
               Select-Object -First 1
-            if (-not $wheel) { throw "$name produced no wheel under artifacts/$name" }
+            if (-not $wheel) { $wheel = $allWheels | Select-Object -First 1 }
+            if (-not $wheel) { throw "$name produced no wheel" }
             $staging = Join-Path $native "unpacked-$name"
             $target = Join-Path $native (Join-Path $map[$name] "native")
             New-Item -ItemType Directory -Force $staging | Out-Null
             New-Item -ItemType Directory -Force $target | Out-Null
-            # tar, not python and not Expand-Archive: bsdtar ships with the Windows runner and extracts a zip
-            # whatever it is called, so neither python quoting nor archive extensions can break this step.
-            # MEASURED: python -m zipfile with relative paths left an empty staging directory (run 41181262856).
             tar -xf $wheel.FullName -C $staging
             if ($LASTEXITCODE -ne 0) { throw "tar could not extract $($wheel.Name)" }
             # Recursive, because setuptools writes the package under <name>.data/purelib/ in a wheel built with
-            # package_data and include_package_data. MEASURED (run 41182003603): the library inside the wheel is at
-            # cpp_kana2-2.0.0.data/purelib/cpp_kana2/_native/libcpp-kana2.dll, not at the archive root.
+            # package_data and include_package_data (MEASURED, run 41182003603).
             $nativeDir = Get-ChildItem $staging -Recurse -Directory -Filter "_native" |
               Select-Object -First 1
-            if (-not $nativeDir) {
-              Write-Host "extracted tree of $($wheel.Name):"
-              Get-ChildItem $staging -Recurse -Force | Select-Object -First 40 |
-                ForEach-Object { $_.FullName.Replace($root, "") } | Out-String | Write-Host
-              throw "$($wheel.Name) contains no _native directory"
-            }
+            if (-not $nativeDir) { throw "$($wheel.Name) contains no _native directory" }
             Get-ChildItem $nativeDir.FullName |
               Where-Object { $_.Extension -in ".dll", ".so", ".dylib" } |
               Copy-Item -Destination $target
