@@ -95,8 +95,18 @@ endif()
 # The outer build's flags are forwarded too. MEASURED: a Clang build that targets the MinGW runtime needs
 # "--target=x86_64-w64-windows-gnu -idirafter <sysroot>/include" in CMAKE_CXX_FLAGS; without it the consumer
 # is configured for the MSVC target and fails to link, reporting a broken install that is not broken.
+#
+# Sanitizer flags are the exception, and they are stripped: they describe the code under test, not the
+# consumer. A consumer that inherits -fsanitize=address,undefined from an instrumented build links against a
+# library that is NOT instrumented and, on the ASan leg of CI, dies in the linker or at startup -- turning this
+# gate red for a reason that has nothing to do with the installed package. MEASURED: that is exactly what
+# happened on the first real CI run (Gate_InstallConsumer, 0.56s).
 if(DEFINED CXX_FLAGS AND NOT CXX_FLAGS STREQUAL "")
-    list(APPEND CONSUMER_COMPILER_ARGS "-DCMAKE_CXX_FLAGS=${CXX_FLAGS}")
+    string(REGEX REPLACE "-f(no-)?sanitize=[^ ]*" "" _consumer_cxx_flags "${CXX_FLAGS}")
+    string(STRIP "${_consumer_cxx_flags}" _consumer_cxx_flags)
+    if(NOT _consumer_cxx_flags STREQUAL "")
+        list(APPEND CONSUMER_COMPILER_ARGS "-DCMAKE_CXX_FLAGS=${_consumer_cxx_flags}")
+    endif()
 endif()
 if(DEFINED EXE_LINK_FLAGS AND NOT EXE_LINK_FLAGS STREQUAL "")
     list(APPEND CONSUMER_COMPILER_ARGS "-DCMAKE_EXE_LINKER_FLAGS=${EXE_LINK_FLAGS}")
