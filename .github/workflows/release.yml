@@ -1,0 +1,278 @@
+# Release: build a wheel on every platform, check each one as a file, and publish.
+#
+# Modelled on cpp-pinyin's release_prep.yml, adopted rather than copied: the shape that matters is
+#   * Linux wheels are built INSIDE quay.io/pypa/manylinux_2_28_<arch>, because a wheel built on a modern
+#     distribution cannot honestly claim a manylinux tag;
+#   * x86_64 and aarch64 are separate runners (ubuntu-latest / ubuntu-24.04-arm), not one emulated job;
+#   * every platform's wheel goes through tools/check_wheel.py before it is uploaded, so a py3-none-any tag or
+#     an empty _native/ fails here rather than at pip install time.
+#
+# This package's wheel is `py3-none-<platform>`: no extension module, so ONE wheel per platform serves every
+# Python 3 version -- that is what makes "multi-version Python" a matrix of 3 runners instead of a matrix of
+# dozens.
+#
+# Publishing is a manual dispatch with publish=true, never a side effect of pushing a tag: the artifacts are
+# reviewed first, and a missing repository secret should stop a dispatch, not turn a release tag red.
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Upload the built artifacts to PyPI and NuGet"
+        type: boolean
+        default: false
+  push:
+    tags: ["2.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  wheels-linux:
+    name: Linux wheel (${{ matrix.arch }})
+    # The container builds the library, the wheel and its own check; 45 minutes is generous and bounded.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+            image: quay.io/pypa/manylinux_2_28_x86_64
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, stage, package and check inside the manylinux image
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/work -w /work ${{ matrix.image }} /bin/bash -lc '
+              set -euo pipefail
+              # The image ships several Pythons under /opt/python and its SYSTEM python3 has no pip at all.
+              # MEASURED on release run 41170738812: "/usr/bin/python3: No module named pip". Pick a real
+              # interpreter first, then everything else uses it.
+              PY=""
+              for candidate in /opt/python/cp312*/bin/python3 /opt/python/cp311*/bin/python3 /opt/python/cp310*/bin/python3; do
+                if [ -x "$candidate" ]; then PY="$candidate"; break; fi
+              done
+              if [ -z "$PY" ]; then echo "no usable python under /opt/python"; exit 1; fi
+              # cmake and ninja are installed by pip into that interpreter bin, so it must be on PATH for CMake to
+              # find them. MEASURED on release run 41170998959: "CMake was unable to find a build program
+              # corresponding to Ninja" plus "CMAKE_CXX_COMPILER not set".
+              export PATH="$(dirname "$PY"):$PATH"
+              # manylinux_2_28 keeps its compiler in a gcc-toolset? then it is not on PATH until enabled, which is
+              # what "CMAKE_CXX_COMPILER not set" meant. MEASURED on runs 41170998959 and 41171179112.
+              for toolset in /opt/rh/gcc-toolset-*/enable; do
+                if [ -f "$toolset" ]; then . "$toolset"; break; fi
+              done
+              "$PY" --version
+              command -v g++ || true
+              g++ --version || true
+              "$PY" -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja || true
+              # Whatever pip managed, the build needs a ninja on PATH; auditwheel? no -- ninja only.
+              if ! command -v ninja >/dev/null 2>&1; then
+                echo "ninja missing after pip; trying the system package manager"
+
+              fi
+              # If no ninja can be obtained without root (dnf needs it, and the container runs as the runner user),
+              # fall back to the image make, which is always there. MEASURED: dnf refused with "superuser
+              # privileges" on runs 41170998959..41171417852.
+              if ! command -v ninja >/dev/null 2>&1; then export CPP_KANA2_CMAKE_GENERATOR="Unix Makefiles"; fi
+              echo "generator: ${CPP_KANA2_CMAKE_GENERATOR:-Ninja}"
+              command -v cmake && cmake --version
+              # No `| head -1` here: with `set -euo pipefail`, head closing the pipe makes the pipeline exit 141 and
+              # the whole build step fails with no message. MEASURED on the first release run: exactly that.
+              cmake --version
+              g++ --version
+              "$PY" python/tools/build_native.py --build-dir build-linux
+              "$PY" -m pip wheel ./python --no-build-isolation --no-deps -w dist
+              WHEEL=$(ls dist/*.whl)
+              "$PY" tools/check_wheel.py --wheel "$WHEEL"
+              # The archive is checked as a file by tools/check_wheel.py above. Loading it is checked where
+              # loading is unambiguous: a separate job per architecture downloads the artifact and pip-installs it
+              # on a runner of the matching architecture (job wheel-load). Inside this container pip refuses the tag
+              # it just produced and the nested quoting of a python -c broke the shell twice (exit 2, run
+              # 41179874824) -- both are artefacts of measuring here rather than measuring for real.
+            '
+
+  wheel-windows:
+    name: Windows wheel (win_amd64)
+    timeout-minutes: 45
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling
+        run: python -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+      - name: Build, stage, package and check
+        env:
+          # The build prints kana to the console; a Windows runner defaults to the ANSI code page and raises
+          # UnicodeEncodeError on the first Japanese character. MEASURED on the first release run.
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          python python/tools/build_native.py --build-dir build-win
+          python -m pip wheel ./python --no-build-isolation --no-deps -w dist
+          python -c "import glob,subprocess,sys; sys.exit(subprocess.call([sys.executable,'tools/check_wheel.py','--wheel',sorted(glob.glob('dist/*.whl'))[0]]))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-windows
+          path: dist/*.whl
+          if-no-files-found: error
+
+  wheel-macos:
+    name: macOS wheel (${{ matrix.arch }})
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build tooling
+        run: python -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
+      - name: Build, stage, package and check
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          python python/tools/build_native.py --build-dir build-macos
+          python -m pip wheel ./python --no-build-isolation --no-deps -w dist
+          python tools/check_wheel.py --wheel "$(ls dist/*.whl | head -1)"
+          python -m pip install --no-deps --target /tmp/installed dist/*.whl
+          PYTHONPATH=/tmp/installed python -c "import cpp_kana2; assert cpp_kana2.kana_to_romaji('きって').rendered == 'kitte'; print('import ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-macos-${{ matrix.arch }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: Source distribution
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the sdist and validate both metadata and README rendering
+        run: |
+          python -m pip install --quiet --disable-pip-version-check build twine
+          # The Python project lives in python/, not at the root: `build` reads its argument as the source tree.
+          # MEASURED on the first release run: "does not appear to be a Python project". 
+          # setup.py refuses to package without a staged native library (that is what keeps a wheel from shipping
+          # an empty _native/), so the sdist job stages one first -- the sdist carries the Windows library today.
+          python python/tools/build_native.py --build-dir build-sdist
+          python -m build --sdist python/ --outdir dist
+          python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  nupkg:
+    name: NuGet package (all RIDs)
+    # One package carrying every platform's native library, so a C# project on any of them restores the same
+    # CppKana2 version. RIDs without a library are simply absent, which NuGet reports at restore time instead
+    # of at first P/Invoke.
+    timeout-minutes: 45
+    needs: [wheels-linux, wheel-windows, wheel-macos]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+        # python unpacks each wheel (Expand-Archive refuses a .whl); a Windows runner has none on PATH otherwise.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Unpack each wheel's native library into its runtimes/<rid>/native
+        shell: pwsh
+        run: |
+          $map = @{
+            "wheel-windows"            = "win-x64"
+            "wheel-linux-x86_64"       = "linux-x64"
+            "wheel-linux-aarch64"      = "linux-arm64"
+            "wheel-macos-arm64"        = "osx-arm64"
+            "wheel-macos-x86_64"       = "osx-x64"
+          }
+          # Laid out exactly where the csproj packs from: runtimes/<rid>/native/<library>.
+          $native = "csharp/CppKana2/runtimes"
+          New-Item -ItemType Directory -Force $native | Out-Null
+          foreach ($name in $map.Keys) {
+            $wheel = Get-ChildItem "artifacts/$name/*.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $wheel) { throw "$name produced no wheel" }
+            $target = Join-Path $native (Join-Path $map[$name] "native")
+            New-Item -ItemType Directory -Force $target | Out-Null
+            Expand-Archive -Path $wheel.FullName -DestinationPath (Join-Path $native "unpacked-$name")
+            Get-ChildItem (Join-Path $native "unpacked-$name/cpp_kana2/_native") |
+              Where-Object { $_.Extension -in ".dll", ".so", ".dylib" } |
+              Copy-Item -Destination $target
+            Remove-Item -Recurse -Force $staging
+          }
+          Get-ChildItem $native -Recurse -File | ForEach-Object { "{0} <- {1}" -f $_.FullName, ($_.Length) }
+      - name: Pack with every runtime in place
+        shell: pwsh
+        run: |
+          # No CppKana2NativeDir here on purpose: the runtimes/ tree above is the whole surface, so the package
+          # contains exactly the platforms whose wheels were built in the jobs this one waits for.
+          dotnet pack csharp/CppKana2/CppKana2.csproj -c Release -o dist
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: dist/*.nupkg
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish to PyPI
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: [wheels-linux, wheel-windows, wheel-macos, sdist]
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "*"
+          merge-multiple: true
+      - name: List what is about to be published
+        run: ls -l dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  publish-nuget:
+    name: Publish to NuGet
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+    needs: nupkg
+    runs-on: windows-latest
+    environment: nuget
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nupkg
+          path: dist
+      - name: Push the package
+        shell: pwsh
+        run: dotnet nuget push dist/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
