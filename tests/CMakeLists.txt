@@ -170,7 +170,7 @@ if (CPP_KANA2_INSTALL)
                     -DGENERATOR=${CMAKE_GENERATOR}
                     -DCOMPILER=${CMAKE_CXX_COMPILER}
                     -DCXX_FLAGS=${CMAKE_CXX_FLAGS} ${CPP_KANA2_CONSUMER_SANITIZER_FLAGS}
-                    -DEXE_LINK_FLAGS=${CMAKE_EXE_LINKER_FLAGS}
+                    -DEXE_LINK_FLAGS=${CMAKE_EXE_LINKER_FLAGS} ${CPP_KANA2_CONSUMER_SANITIZER_FLAGS}
                     -P ${CMAKE_SOURCE_DIR}/tests/install/check_install_consumer.cmake)
     set_tests_properties(Gate_InstallConsumer PROPERTIES LABELS "gate")
 endif ()
