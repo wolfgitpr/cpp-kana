@@ -80,7 +80,13 @@ def check(wheel: Path) -> list[str]:
 
         # 4. The licence, the metadata, and nothing that only exists on a build machine.
         metadata = [entry for entry in entries if entry.endswith(".dist-info/METADATA")]
-        if not any(entry.endswith(".dist-info/LICENSE") for entry in entries):
+        # PEP 639 moved the licence to dist-info/licenses/. Newer setuptools writes that layout, older ones wrote
+        # dist-info/LICENSE; both are correct, and a check that only knows one of them fails on a runner whose
+        # setuptools is newer than the machine the gate was written on. MEASURED: the first release run failed
+        # exactly this way, on a wheel that did carry the licence.
+        licence_entries = [entry for entry in entries
+                           if entry.endswith((".dist-info/LICENSE", ".dist-info/licenses/LICENSE"))]
+        if not licence_entries:
             problems.append(f"{name}: no LICENSE in dist-info (Apache-2.0 in METADATA is not the licence text)")
         if metadata:
             text = archive.read(metadata[0]).decode("utf-8", "replace")

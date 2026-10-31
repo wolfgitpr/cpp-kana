@@ -148,6 +148,9 @@ jobs:
           python -m pip install --quiet --disable-pip-version-check build twine
           # The Python project lives in python/, not at the root: `build` reads its argument as the source tree.
           # MEASURED on the first release run: "does not appear to be a Python project". 
+          # setup.py refuses to package without a staged native library (that is what keeps a wheel from shipping
+          # an empty _native/), so the sdist job stages one first -- the sdist carries the Windows library today.
+          python python/tools/build_native.py --build-dir build-sdist
           python -m build --sdist python/ --outdir dist
           python -m twine check dist/*
       - uses: actions/upload-artifact@v4
