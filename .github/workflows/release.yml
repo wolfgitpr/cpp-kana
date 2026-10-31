@@ -55,8 +55,10 @@ jobs:
               # The image ships several Pythons; pick the one pip belongs to and make sure setuptools and wheel
               # are present, because the wheel is built with --no-build-isolation and fetches nothing.
               python3 -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
-              cmake --version | head -1
-              g++ --version | head -1
+              # No `| head -1` here: with `set -euo pipefail`, head closing the pipe makes the pipeline exit 141 and
+              # the whole build step fails with no message. MEASURED on the first release run: exactly that.
+              cmake --version
+              g++ --version
               python3 python/tools/build_native.py --build-dir build-linux
               python3 -m pip wheel ./python --no-build-isolation --no-deps -w dist
               python3 tools/check_wheel.py --wheel "$(ls dist/*.whl | head -1)"
@@ -82,6 +84,11 @@ jobs:
       - name: Install build tooling
         run: python -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
       - name: Build, stage, package and check
+        env:
+          # The build prints kana to the console; a Windows runner defaults to the ANSI code page and raises
+          # UnicodeEncodeError on the first Japanese character. MEASURED on the first release run.
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: |
           python python/tools/build_native.py --build-dir build-win
           python -m pip wheel ./python --no-build-isolation --no-deps -w dist
@@ -102,7 +109,7 @@ jobs:
           - arch: arm64
             runner: macos-14
           - arch: x86_64
-            runner: macos-13
+            runner: macos-15-intel
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +119,9 @@ jobs:
       - name: Install build tooling
         run: python -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
       - name: Build, stage, package and check
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: |
           python python/tools/build_native.py --build-dir build-macos
           python -m pip wheel ./python --no-build-isolation --no-deps -w dist
@@ -136,7 +146,9 @@ jobs:
       - name: Build the sdist and validate both metadata and README rendering
         run: |
           python -m pip install --quiet --disable-pip-version-check build twine
-          python -m build --sdist --outdir dist
+          # The Python project lives in python/, not at the root: `build` reads its argument as the source tree.
+          # MEASURED on the first release run: "does not appear to be a Python project". 
+          python -m build --sdist python/ --outdir dist
           python -m twine check dist/*
       - uses: actions/upload-artifact@v4
         with:
