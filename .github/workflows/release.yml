@@ -60,6 +60,10 @@ jobs:
                 if [ -x "$candidate" ]; then PY="$candidate"; break; fi
               done
               if [ -z "$PY" ]; then echo "no usable python under /opt/python"; exit 1; fi
+              # cmake and ninja are installed by pip into that interpreter bin, so it must be on PATH for CMake to
+              # find them. MEASURED on release run 41170998959: "CMake was unable to find a build program
+              # corresponding to Ninja" plus "CMAKE_CXX_COMPILER not set".
+              export PATH="$(dirname "$PY"):$PATH"
               "$PY" --version
               "$PY" -m pip install --quiet --disable-pip-version-check setuptools wheel cmake ninja
               # No `| head -1` here: with `set -euo pipefail`, head closing the pipe makes the pipeline exit 141 and
