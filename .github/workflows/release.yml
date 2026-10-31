@@ -254,6 +254,11 @@ jobs:
           }
           Get-ChildItem $native -Recurse -File | ForEach-Object { $_.FullName.Replace($root, "") }
 
+      - name: Generate the C# build info the project requires
+        # The csproj refuses to build without version.props and BuildInfo.g.cs, which emit_build_info.py writes from
+        # the native library. MEASURED: run 41182728020 failed at dotnet pack with exactly that message.
+        run: python csharp/tools/emit_build_info.py --native csharp/CppKana2/runtimes/win-x64/native/libcpp-kana2.dll
+
       - name: Pack with every runtime in place
         shell: pwsh
         run: |
